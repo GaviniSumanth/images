@@ -188,7 +188,7 @@ jobs:
         with:
           context: ./source
           file: ./build/${{ matrix.release.containerfile }}
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           push: true
           pull: true
           tags: |
@@ -224,7 +224,6 @@ jobs:
         release: ${{ fromJson(needs.detect.outputs.matrix) }}
         platform:
           - linux/amd64
-          - linux/arm64
 
     steps:
       - name: Set image names
