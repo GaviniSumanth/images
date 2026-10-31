@@ -1,0 +1,230 @@
+# syntax=docker/dockerfile:1
+
+ARG NODE_BUILD_IMAGE=dhi.io/node:24-alpine-dev
+ARG NODE_RUNTIME_IMAGE=dhi.io/node:24-alpine
+
+ARG NUSQLITE3_DIR=/usr/local/lib/nusqlite3
+ARG NUSQLITE3_PATH=${NUSQLITE3_DIR}/libnusqlite3.so
+
+
+# --------------------------------------------------
+# Stage 1: Build frontend
+# Build on build platform to avoid QEMU execution
+# --------------------------------------------------
+
+FROM --platform=$BUILDPLATFORM ${NODE_BUILD_IMAGE} AS build-client
+
+WORKDIR /client
+
+COPY client/ ./
+
+RUN npm ci \
+    && npm run generate \
+    && npm cache clean --force
+
+
+# --------------------------------------------------
+# Stage 2: Compile server
+# Compile on build platform to avoid QEMU SIGILL
+# --------------------------------------------------
+
+FROM --platform=$BUILDPLATFORM ${NODE_BUILD_IMAGE} AS compile-server
+
+WORKDIR /server
+
+COPY index.js package*.json tsconfig.server.json ./
+
+COPY server/ ./server/
+
+RUN npm ci --include=dev --ignore-scripts \
+    && npm run build:server \
+    && npm cache clean --force
+
+
+# --------------------------------------------------
+# Stage 3: Install target architecture dependencies
+# --------------------------------------------------
+
+FROM ${NODE_BUILD_IMAGE} AS build-server
+
+ARG NUSQLITE3_DIR
+ARG TARGETPLATFORM
+
+ENV NODE_ENV=production
+
+RUN apk add --no-cache \
+    curl \
+    make \
+    python3 \
+    g++ \
+    unzip
+
+WORKDIR /server
+
+COPY index.js package*.json ./
+
+COPY server/ ./server/
+
+COPY --from=compile-server /server/dist-server ./dist-server
+
+
+# Download architecture-specific NuSQLite library
+
+RUN set -eux; \
+    case "${TARGETPLATFORM}" in \
+        "linux/amd64") \
+            LIBRARY_URL="https://github.com/mikiher/nunicode-sqlite/releases/download/v1.2/libnusqlite3-linux-musl-x64.zip" \
+            ;; \
+        "linux/arm64") \
+            LIBRARY_URL="https://github.com/mikiher/nunicode-sqlite/releases/download/v1.2/libnusqlite3-linux-musl-arm64.zip" \
+            ;; \
+        *) \
+            echo "Unsupported platform: ${TARGETPLATFORM}"; \
+            exit 1 \
+            ;; \
+    esac; \
+    mkdir -p "${NUSQLITE3_DIR}"; \
+    curl --fail --show-error --location --retry 3 \
+        "${LIBRARY_URL}" \
+        --output /tmp/library.zip; \
+    unzip /tmp/library.zip -d "${NUSQLITE3_DIR}"; \
+    rm -f /tmp/library.zip; \
+    test -f "${NUSQLITE3_DIR}/libnusqlite3.so"
+
+
+# Install production dependencies
+
+RUN npm ci --omit=dev \
+    && npm cache clean --force
+
+# --------------------------------------------------
+# Stage 4: Prepare runtime dependencies
+# --------------------------------------------------
+
+FROM ${NODE_BUILD_IMAGE} AS runtime-deps
+
+ARG NUSQLITE3_PATH
+
+# Install FFmpeg and musl dependency inspection utility
+
+RUN apk add --no-cache \
+    ffmpeg \
+    musl-utils
+
+COPY --from=build-server \
+    ${NUSQLITE3_PATH} \
+    /tmp/libnusqlite3.so
+
+
+# Validate FFmpeg installation
+
+RUN set -eux; \
+    ffmpeg -hide_banner -version; \
+    ffprobe -hide_banner -version; \
+    ffmpeg -hide_banner -filters > /dev/null; \
+    ffmpeg -hide_banner -encoders > /dev/null; \
+    ffmpeg -hide_banner -decoders > /dev/null
+
+
+# Collect executables and their shared-library dependencies
+
+RUN set -eux; \
+    mkdir -p /runtime-root; \
+    \
+    copy_binary() { \
+        binary="$1"; \
+        destination="/runtime-root${binary}"; \
+        \
+        echo "Collecting: ${binary}"; \
+        test -f "${binary}"; \
+        mkdir -p "$(dirname "${destination}")"; \
+        cp -L "${binary}" "${destination}"; \
+        \
+        ldd "${binary}" > /tmp/ldd-output; \
+        cat /tmp/ldd-output; \
+        \
+        if grep -q "not found" /tmp/ldd-output; then \
+            echo "ERROR: Missing dependencies for ${binary}"; \
+            exit 1; \
+        fi; \
+        \
+        awk '{ \
+            if ($2 == "=>" && $3 ~ /^\//) { \
+                print $3; \
+            } else if ($1 ~ /^\//) { \
+                print $1; \
+            } \
+        }' /tmp/ldd-output | sort -u | while IFS= read -r path; do \
+            case "${path}" in \
+                /lib/ld-musl-*.so.1|/lib/libc.musl-*.so.1) \
+                    echo "Using runtime-provided musl: ${path}"; \
+                    ;; \
+                /*) \
+                    test -f "${path}"; \
+                    mkdir -p "/runtime-root$(dirname "${path}")"; \
+                    cp -L "${path}" "/runtime-root${path}"; \
+                    echo "Copied library: ${path}"; \
+                    ;; \
+            esac; \
+        done; \
+    }; \
+    \
+    copy_binary /usr/bin/ffmpeg; \
+    copy_binary /usr/bin/ffprobe; \
+    copy_binary /tmp/libnusqlite3.so; \
+    \
+    rm -f /runtime-root/tmp/libnusqlite3.so; \
+    \
+    echo "Runtime dependencies collected successfully"
+
+
+# --------------------------------------------------
+# Stage 5: Minimal hardened runtime
+# --------------------------------------------------
+
+FROM ${NODE_RUNTIME_IMAGE} AS runtime
+
+ARG NUSQLITE3_DIR
+ARG NUSQLITE3_PATH
+
+ENV NODE_ENV=production \
+    PORT=8000 \
+    CONFIG_PATH=/config \
+    METADATA_PATH=/metadata \
+    SOURCE=docker \
+    NUSQLITE3_DIR=${NUSQLITE3_DIR} \
+    NUSQLITE3_PATH=${NUSQLITE3_PATH}
+
+WORKDIR /app
+
+# Copy runtime binaries and their shared libraries
+
+COPY --from=runtime-deps /runtime-root/ /
+
+# Copy frontend
+
+COPY --from=build-client \
+    --chown=1000:1000 \
+    /client/dist \
+    /app/client/dist
+
+# Copy server and production dependencies
+
+COPY --from=build-server \
+    --chown=1000:1000 \
+    /server/ \
+    /app/
+
+# Copy NuSQLite native library
+
+COPY --from=build-server \
+    --chown=1000:1000 \
+    ${NUSQLITE3_PATH} \
+    ${NUSQLITE3_PATH}
+
+EXPOSE 8000
+
+# DHI Node runtime defaults to UID 1000.
+# Do not switch to root.
+
+CMD ["node", "dist-server/index.js"]

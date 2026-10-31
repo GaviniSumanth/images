@@ -1,0 +1,10 @@
+{
+  "repositories": [
+    {
+      "repository": "advplyr/audiobookshelf",
+      "version": "v2.37.2",
+      "containerfile": "audiobookshelf/Containerfile",
+      "image": "audiobookshelf"
+    }
+  ]
+}

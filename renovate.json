@@ -1,0 +1,42 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "helpers:pinGitHubActionDigests"
+  ],
+  "prConcurrentLimit": 5,
+  "prHourlyLimit": 2,
+  "labels": [
+    "dependencies",
+    "renovate"
+  ],
+  "customManagers": [
+    {
+      "customType": "jsonata",
+      "fileFormat": "json",
+      "managerFilePatterns": [
+        "/^releases\\.json$/"
+      ],
+      "matchStrings": [
+        "$.repositories.{\"depName\": repository, \"currentValue\": version}"
+      ],
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "loose"
+    }
+  ],
+  "packageRules": [
+    {
+      "matchManagers": [
+        "custom.jsonata"
+      ],
+      "groupName": "upstream application releases",
+      "automerge": false
+    },
+    {
+      "matchManagers": [
+        "dockerfile"
+      ],
+      "pinDigests": true
+    }
+  ]
+}
