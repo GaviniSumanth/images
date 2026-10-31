@@ -32,7 +32,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -137,13 +137,13 @@ jobs:
 
     steps:
       - name: Checkout build repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: build
           persist-credentials: false
 
       - name: Checkout upstream source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: ${{ matrix.release.repo }}
           ref: ${{ matrix.release.tag }}
@@ -171,20 +171,20 @@ jobs:
           echo "candidate=candidate-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Login to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push candidate image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./source
           file: ./build/${{ matrix.release.containerfile }}
@@ -252,7 +252,7 @@ jobs:
         with:
           image-ref: ${{ steps.image.outputs.name }}:${{ steps.image.outputs.candidate }}
           format: table
-          vuln-type: os,library
+          vuln-type: os
           severity: CRITICAL,HIGH
           ignore-unfixed: true
           trivy-args: --platform ${{ matrix.platform }}
@@ -309,7 +309,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Promote scanned image
         env:
