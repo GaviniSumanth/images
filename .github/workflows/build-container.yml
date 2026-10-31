@@ -248,13 +248,14 @@ jobs:
 
       - name: Scan candidate image
         uses: aquasecurity/trivy-action@v0.36.0
+        env:
+          TRIVY_PLATFORM: ${{ matrix.platform }}
         with:
           image-ref: ${{ steps.image.outputs.name }}:${{ steps.image.outputs.candidate }}
           format: table
           vuln-type: os
           severity: CRITICAL,HIGH
           ignore-unfixed: true
-          trivy-args: --platform ${{ matrix.platform }}
           exit-code: "1"
 
   # --------------------------------------------------
