@@ -18,7 +18,7 @@
   ],
   "customManagers": [
     {
-      "customType": "jsonata",
+      "customType": "regex",
       "fileFormat": "json",
       "managerFilePatterns": [
         "/^releases\\.json$/"
@@ -28,7 +28,7 @@
       ],
       "datasourceTemplate": "github-releases",
       "versioningTemplate": "loose"
-    }
+    } 
   ],
   "packageRules": [
     {
