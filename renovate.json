@@ -10,6 +10,12 @@
     "dependencies",
     "renovate"
   ],
+  "hostRules": [
+    {
+      "matchHost": "dhi.io",
+      "hostType": "docker"
+    }
+  ],
   "customManagers": [
     {
       "customType": "jsonata",

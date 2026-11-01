@@ -9,6 +9,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  issues: write
 
 concurrency:
   group: renovate
@@ -29,6 +30,12 @@ jobs:
         env:
           RENOVATE_GIT_AUTHOR: 100990200+GaviniSumanth@users.noreply.github.com
           LOG_LEVEL: debug
+          RENOVATE_REPOSITORIES: ${{ github.repository }}
+          RENOVATE_DOCKER_DHI_IO_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          RENOVATE_DOCKER_DHI_IO_PASSWORD: ${{ secrets.DOCKERHUB_TOKEN }}
         with:
           configurationFile: renovate.json
-          token: ${{ secrets.RENOVATE_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          additional-env-list: |
+            RENOVATE_DOCKER_DHI_IO_USERNAME
+            RENOVATE_DOCKER_DHI_IO_PASSWORD
