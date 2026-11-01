@@ -129,7 +129,7 @@ RUN set -eux; \
 # Collect executables and their shared-library dependencies
 
 RUN set -eux; \
-    mkdir -p /runtime-root; \
+    install -d -o 1000 -g 1000 /runtime-root/config /runtime-root/metadata; \
     \
     copy_binary() { \
         binary="$1"; \
@@ -221,9 +221,6 @@ COPY --from=build-server \
     --chown=1000:1000 \
     ${NUSQLITE3_PATH} \
     ${NUSQLITE3_PATH}
-
-RUN mkdir -p /config /metadata \
-    && chown -R 1000:1000 /config /metadata
 
 EXPOSE 8000
 
