@@ -9,7 +9,7 @@ test -f "build/$TESTFILE" || {
   exit 1
 }
 
-test -f "build/$TEST_CONTEXT/run-tests" || {
-  echo "::error::Missing test entrypoint: $TEST_CONTEXT/run-tests"
+test -f "build/$TEST_CONTEXT/run-tests.sh" || {
+  echo "::error::Missing test entrypoint: $TEST_CONTEXT/run-tests.sh"
   exit 1
 }

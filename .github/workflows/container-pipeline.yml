@@ -52,7 +52,7 @@ jobs:
 
       - name: Set image names
         id: image
-        run: .github/scripts/set-image-names.sh "${{ inputs.owner }}" "${{ matrix.release.image }}"
+        run: build/.github/scripts/set-image-names.sh "${{ inputs.owner }}" "${{ matrix.release.image }}"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
@@ -94,7 +94,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=${{ matrix.release.image }}
 
       - name: Validate test configuration
-        run: .github/scripts/validate-test-config.sh "${{ matrix.release.testfile }}" "${{ matrix.release.test_context }}"
+        run: build/.github/scripts/validate-test-config.sh "${{ matrix.release.testfile }}" "${{ matrix.release.test_context }}"
 
       - name: Build and push test runner
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
@@ -168,6 +168,7 @@ jobs:
 
       - name: Execute image tests
         run: ./run-tests.sh
+        working-directory: /tests
 
       - name: Logout from GHCR
         if: always()
@@ -180,6 +181,7 @@ jobs:
     timeout-minutes: 20
 
     permissions:
+      contents: read
       packages: read
 
     strategy:
@@ -190,9 +192,15 @@ jobs:
           - linux/amd64
 
     steps:
+      - name: Checkout build repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          path: build
+          persist-credentials: false
+
       - name: Set image names
         id: image
-        run: .github/scripts/set-image-names.sh "${{ inputs.owner }}" "${{ matrix.release.image }}"
+        run: build/.github/scripts/set-image-names.sh "${{ inputs.owner }}" "${{ matrix.release.image }}"
 
       - name: Login to GHCR
         uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4
@@ -220,6 +228,7 @@ jobs:
     timeout-minutes: 15
 
     permissions:
+      contents: read
       packages: write
 
     strategy:
@@ -228,9 +237,15 @@ jobs:
         release: ${{ fromJson(inputs.matrix || '[]') }}
 
     steps:
+      - name: Checkout build repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          path: build
+          persist-credentials: false
+
       - name: Set image names
         id: image
-        run: .github/scripts/set-image-names.sh "${{ inputs.owner }}" "${{ matrix.release.image }}"
+        run: build/.github/scripts/set-image-names.sh "${{ inputs.owner }}" "${{ matrix.release.image }}"
 
       - name: Log in to Docker Hub
         uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4

@@ -6,4 +6,4 @@ WORKDIR /tests
 
 COPY . .
 
-RUN chmod +x /tests/run-tests
+RUN chmod +x /tests/run-tests.sh
