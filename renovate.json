@@ -18,16 +18,23 @@
   ],
   "customManagers": [
     {
-      "customType": "regex",
+      "customType": "jsonata",
+      "fileFormat": "json",
       "managerFilePatterns": [
         "/^releases\\.json$/"
       ],
       "matchStrings": [
-        "\"repository\":\\s*\"(?<depName>[^\" ]+)\",\\s*\"version\":\\s*\"(?<currentValue>[^\" ]+)\""
+        "$.repositories.{\"depName\": repository, \"currentValue\": version}"
       ],
       "datasourceTemplate": "github-releases",
       "versioningTemplate": "loose"
     }
+  ],
+  "enabledManagers": [
+    "dockerfile",
+    "github-actions",
+    "custom.jsonata",
+    "renovate-config"
   ],
   "packageRules": [
     {
