@@ -36,6 +36,7 @@ docker run --rm -i \
 echo "Running FFmpeg runtime tests inside candidate..."
 
 docker run --rm \
+  --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m,uid=1000,gid=1000 \
   --mount "type=volume,src=${TEST_VOLUME},dst=/tests,readonly" \
   --entrypoint node \
   "$TEST_IMAGE" \
