@@ -222,9 +222,9 @@ COPY --from=build-server \
     ${NUSQLITE3_PATH} \
     ${NUSQLITE3_PATH}
 
-EXPOSE 8000
+RUN mkdir -p /config /metadata \
+    && chown -R 1000:1000 /config /metadata
 
-# DHI Node runtime defaults to UID 1000.
-# Do not switch to root.
+EXPOSE 8000
 
 CMD ["node", "dist-server/index.js"]

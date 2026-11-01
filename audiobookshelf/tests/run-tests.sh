@@ -50,8 +50,6 @@ echo "Starting AudioBookShelf candidate..."
 
 docker run -d \
   --name "$CONTAINER_NAME" \
-  --tmpfs /config:rw,nosuid,nodev,size=64m,uid=1000,gid=1000 \
-  --tmpfs /metadata:rw,nosuid,nodev,size=256m,uid=1000,gid=1000 \
   -p "${PORT}:8000" \
   "$TEST_IMAGE"
 
