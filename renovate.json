@@ -33,7 +33,7 @@
   "enabledManagers": [
     "dockerfile",
     "github-actions",
-    "custom.jsonata",
+    "jsonata",
     "renovate-config"
   ],
   "packageRules": [
