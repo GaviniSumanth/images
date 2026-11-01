@@ -19,16 +19,15 @@
   "customManagers": [
     {
       "customType": "regex",
-      "fileFormat": "json",
       "managerFilePatterns": [
         "/^releases\\.json$/"
       ],
       "matchStrings": [
-        "$.repositories.{\"depName\": repository, \"currentValue\": version}"
+        "\"repository\":\\s*\"(?<depName>[^\" ]+)\",\\s*\"version\":\\s*\"(?<currentValue>[^\" ]+)\""
       ],
       "datasourceTemplate": "github-releases",
       "versioningTemplate": "loose"
-    } 
+    }
   ],
   "packageRules": [
     {
