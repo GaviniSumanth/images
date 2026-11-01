@@ -35,7 +35,7 @@ jobs:
           RENOVATE_DOCKER_DHI_IO_PASSWORD: ${{ secrets.DOCKERHUB_TOKEN }}
         with:
           configurationFile: renovate.json
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.RENOVATE_TOKEN }}
           additional-env-list: |
             RENOVATE_DOCKER_DHI_IO_USERNAME
             RENOVATE_DOCKER_DHI_IO_PASSWORD
