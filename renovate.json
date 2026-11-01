@@ -33,13 +33,6 @@
   "packageRules": [
     {
       "matchManagers": [
-        "custom.jsonata"
-      ],
-      "groupName": "upstream application releases",
-      "automerge": false
-    },
-    {
-      "matchManagers": [
         "dockerfile"
       ],
       "pinDigests": true
