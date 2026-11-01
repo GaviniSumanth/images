@@ -24,11 +24,10 @@ echo "Preparing runtime tests..."
 
 docker volume create "$TEST_VOLUME"
 
-docker run --rm \
+docker run --rm -i \
   -v "$TEST_VOLUME:/tests" \
-  -v "$PWD:/test-source:ro" \
   alpine:3.22 \
-  cp /test-source/test-ffmpeg-runtime.cjs /tests/test-ffmpeg-runtime.cjs
+  sh -c 'cat > /tests/test-ffmpeg-runtime.cjs' < test-ffmpeg-runtime.cjs
 
 # --------------------------------------------------
 # FFmpeg runtime tests inside candidate
