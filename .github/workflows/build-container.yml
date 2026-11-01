@@ -7,21 +7,22 @@ on:
     paths:
       - releases.json
       - "**/Containerfile"
+      - "**/tests/**"
       - .github/workflows/build-container.yml
+      - .github/workflows/container-pipeline.yml
+      - .github/scripts/**
 
   workflow_dispatch:
 
 permissions:
   contents: read
+  packages: write
 
 concurrency:
   group: container-build-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  # --------------------------------------------------
-  # Detect releases that need rebuilding
-  # --------------------------------------------------
   detect:
     name: Detect changed releases
     runs-on: ubuntu-latest
@@ -29,6 +30,7 @@ jobs:
 
     outputs:
       matrix: ${{ steps.changes.outputs.matrix }}
+      owner: ${{ steps.meta.outputs.owner }}
 
     steps:
       - name: Checkout repository
@@ -37,290 +39,28 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Normalize registry owner
+        id: meta
+        env:
+          OWNER: ${{ github.repository_owner }}
+        run: echo "owner=$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
       - name: Validate release configuration
-        run: |
-          jq -e '
-            (if type == "array" then {repositories: .} else . end) as $root |
-            
-            ($root.repositories | type == "array") and
-            ($root.repositories | length > 0) and
-            ([$root.repositories[].repository] | length == (unique | length)) and
-            ([$root.repositories[].image] | length == ([$root.repositories[].image] | unique | length)) and
-            all(
-              $root.repositories[];
-              (.repository | test("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")) and
-              (.version | test("^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$")) and
-              (.containerfile | test("^[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*/Containerfile$")) and
-              (.image | test("^[a-z0-9][a-z0-9._-]*$"))
-            )
-          ' releases.json
+        run: bash .github/scripts/validate-releases.sh
 
       - name: Detect changed releases
         id: changes
-        env:
-          BEFORE: ${{ github.event.before }}
-          CURRENT: ${{ github.sha }}
         run: |
-          set -euo pipefail
+          matrix_output=$(bash .github/scripts/detect-changes.sh "${{ github.event.before }}" "${{ github.sha }}")
+          echo "$matrix_output" >> "$GITHUB_OUTPUT"
+          echo "Build matrix: $(echo "$matrix_output" | cut -d'=' -f2-)"
 
-          old='{"repositories":[]}'
-
-          if [[ "$BEFORE" =~ ^[0-9a-f]{40}$ ]] &&
-             [[ "$BEFORE" != "0000000000000000000000000000000000000000" ]]; then
-            old=$(git show "$BEFORE:releases.json" 2>/dev/null || echo '{"repositories":[]}')
-          fi
-
-          changed='[]'
-
-          if [[ "$BEFORE" =~ ^[0-9a-f]{40}$ ]] &&
-             [[ "$BEFORE" != "0000000000000000000000000000000000000000" ]]; then
-            changed=$(git diff --name-only "$BEFORE" "$CURRENT" |
-              jq -Rsc 'split("\n") | map(select(length > 0))')
-          else
-            changed='[".github/workflows/build-container.yml"]'
-          fi
-
-          matrix=$(jq -cn \
-            --argjson old "$old" \
-            --argjson new "$(cat releases.json)" \
-            --argjson changed "$changed" \
-            '
-            $new.repositories |
-            map(
-              . as $r |
-              ([
-                $old.repositories[]? |
-                select(.repository == $r.repository)
-              ][0] // null) as $o |
-              select(
-                $o == null or
-                $o.version != $r.version or
-                $o.containerfile != $r.containerfile or
-                $o.image != $r.image or
-                ($changed | index($r.containerfile)) != null or
-                ($changed | index($o.containerfile // "")) != null or
-                ($changed | index(".github/workflows/build-container.yml")) != null
-              ) |
-              {
-                repo: $r.repository,
-                tag: $r.version,
-                containerfile: $r.containerfile,
-                image: $r.image
-              }
-            )
-            ')
-
-          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
-
-          echo "Build matrix: $matrix"
-
-  # --------------------------------------------------
-  # Stage 1: Build and push temporary candidate images
-  # --------------------------------------------------
-  build:
-    name: Build ${{ matrix.release.image }}
+  dispatch:
+    name: Run Container Pipeline
     needs: detect
-
     if: needs.detect.outputs.matrix != '[]'
-
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-
-    permissions:
-      contents: read
-      packages: write
-
-    strategy:
-      fail-fast: false
-      matrix:
-        release: ${{ fromJson(needs.detect.outputs.matrix) }}
-
-    steps:
-      - name: Checkout build repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          path: build
-          persist-credentials: false
-
-      - name: Checkout upstream source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          repository: ${{ matrix.release.repo }}
-          ref: ${{ matrix.release.tag }}
-          path: source
-          persist-credentials: false
-
-      - name: Get upstream revision
-        id: upstream
-        working-directory: source
-        run: |
-          set -euo pipefail
-          echo "revision=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-
-      - name: Set image names
-        id: image
-        env:
-          OWNER: ${{ github.repository_owner }}
-          IMAGE: ${{ matrix.release.image }}
-        run: |
-          set -euo pipefail
-
-          owner=$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')
-
-          echo "name=ghcr.io/${owner}/${IMAGE}" >> "$GITHUB_OUTPUT"
-          echo "candidate=candidate-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
-
-      - name: Login to GHCR
-        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push candidate image
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
-        with:
-          context: ./source
-          file: ./build/${{ matrix.release.containerfile }}
-          platforms: linux/amd64
-          push: true
-          pull: true
-          tags: |
-            ${{ steps.image.outputs.name }}:${{ steps.image.outputs.candidate }}
-          labels: |
-            org.opencontainers.image.title=${{ matrix.release.image }}
-            org.opencontainers.image.source=https://github.com/${{ matrix.release.repo }}
-            org.opencontainers.image.version=${{ matrix.release.tag }}
-            org.opencontainers.image.revision=${{ steps.upstream.outputs.revision }}
-          provenance: mode=max
-          sbom: true
-          cache-from: type=gha,scope=${{ matrix.release.image }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.release.image }}
-
-  # --------------------------------------------------
-  # Stage 2: Scan candidate images
-  # --------------------------------------------------
-  scan:
-    name: Scan ${{ matrix.release.image }} (${{ matrix.platform }})
-    needs:
-      - detect
-      - build
-
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-
-    permissions:
-      packages: read
-
-    strategy:
-      fail-fast: false
-      matrix:
-        release: ${{ fromJson(needs.detect.outputs.matrix) }}
-        platform:
-          - linux/amd64
-
-    steps:
-      - name: Set image names
-        id: image
-        env:
-          OWNER: ${{ github.repository_owner }}
-          IMAGE: ${{ matrix.release.image }}
-        run: |
-          set -euo pipefail
-
-          owner=$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')
-
-          echo "name=ghcr.io/${owner}/${IMAGE}" >> "$GITHUB_OUTPUT"
-          echo "candidate=candidate-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
-
-      - name: Login to GHCR
-        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Scan candidate image
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-        env:
-          TRIVY_PLATFORM: ${{ matrix.platform }}
-        with:
-          image-ref: ${{ steps.image.outputs.name }}:${{ steps.image.outputs.candidate }}
-          format: table
-          vuln-type: os
-          severity: CRITICAL,HIGH
-          ignore-unfixed: true
-          exit-code: "1"
-
-  # --------------------------------------------------
-  # Stage 3: Promote scanned candidate to release tag
-  # --------------------------------------------------
-  publish:
-    name: Publish ${{ matrix.release.image }}
-    needs:
-      - detect
-      - build
-      - scan
-
-    if: needs.detect.outputs.matrix != '[]'
-
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-
-    permissions:
-      packages: write
-
-    strategy:
-      fail-fast: false
-      matrix:
-        release: ${{ fromJson(needs.detect.outputs.matrix) }}
-
-    steps:
-      - name: Set image names
-        id: image
-        env:
-          OWNER: ${{ github.repository_owner }}
-          IMAGE: ${{ matrix.release.image }}
-        run: |
-          set -euo pipefail
-
-          owner=$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')
-
-          echo "name=ghcr.io/${owner}/${IMAGE}" >> "$GITHUB_OUTPUT"
-          echo "candidate=candidate-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Login to GHCR
-        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
-
-      - name: Promote scanned image
-        env:
-          IMAGE: ${{ steps.image.outputs.name }}
-          CANDIDATE: ${{ steps.image.outputs.candidate }}
-          RELEASE: ${{ matrix.release.tag }}
-        run: |
-          set -euo pipefail
-
-          docker buildx imagetools create \
-            --tag "${IMAGE}:${RELEASE}" \
-            "${IMAGE}:${CANDIDATE}"
-
-          echo "Published ${IMAGE}:${RELEASE}"
+    uses: ./.github/workflows/container-pipeline.yml
+    with:
+      matrix: ${{ needs.detect.outputs.matrix }}
+      owner: ${{ needs.detect.outputs.owner }}
+    secrets: inherit

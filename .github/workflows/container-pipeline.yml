@@ -1,0 +1,258 @@
+name: Container Pipeline
+
+on:
+  workflow_call:
+    inputs:
+      matrix:
+        required: true
+        type: string
+      owner:
+        required: true
+        type: string
+    secrets:
+      DOCKERHUB_USERNAME:
+        required: true
+      DOCKERHUB_TOKEN:
+        required: true
+
+jobs:
+  build:
+    name: Build ${{ matrix.release.image }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        release: ${{ fromJson(inputs.matrix || '[]') }}
+
+    steps:
+      - name: Checkout build repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          path: build
+          persist-credentials: false
+
+      - name: Checkout upstream source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ${{ matrix.release.repo }}
+          ref: ${{ matrix.release.tag }}
+          path: source
+          persist-credentials: false
+
+      - name: Get upstream revision
+        id: upstream
+        working-directory: source
+        run: echo "revision=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Set image names
+        id: image
+        run: .github/scripts/set-image-names.sh "${{ inputs.owner }}" "${{ matrix.release.image }}"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+
+      - name: Login to GHCR
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login to Docker Hardened Images
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4
+        with:
+          registry: dhi.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push candidate image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
+        with:
+          context: ./source
+          file: ./build/${{ matrix.release.containerfile }}
+          platforms: linux/amd64
+          push: true
+          pull: true
+          tags: ${{ steps.image.outputs.name }}:${{ steps.image.outputs.candidate }}
+          labels: |
+            org.opencontainers.image.title=${{ matrix.release.image }}
+            org.opencontainers.image.source=https://github.com/${{ matrix.release.repo }}
+            org.opencontainers.image.version=${{ matrix.release.tag }}
+            org.opencontainers.image.revision=${{ steps.upstream.outputs.revision }}
+          provenance: mode=max
+          sbom: true
+          cache-from: type=gha,scope=${{ matrix.release.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.release.image }}
+
+      - name: Validate test configuration
+        run: .github/scripts/validate-test-config.sh "${{ matrix.release.testfile }}" "${{ matrix.release.test_context }}"
+
+      - name: Build and push test runner
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
+        with:
+          context: ./build/${{ matrix.release.test_context }}
+          file: ./build/${{ matrix.release.testfile }}
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.image.outputs.test_name }}:${{ steps.image.outputs.candidate }}
+          cache-from: type=gha,scope=${{ matrix.release.image }}-tests
+          cache-to: type=gha,mode=max,scope=${{ matrix.release.image }}-tests
+
+  test:
+    name: Test ${{ matrix.release.image }}
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    permissions:
+      packages: read
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        release: ${{ fromJson(inputs.matrix || '[]') }}
+
+    container:
+      image: ghcr.io/${{ inputs.owner }}/${{ matrix.release.image }}-test-runner:candidate-${{ github.run_id }}-${{ github.run_attempt }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+      env:
+        DOCKER_HOST: tcp://docker:2376
+        DOCKER_TLS_VERIFY: "1"
+        DOCKER_CERT_PATH: /certs/client
+        TEST_IMAGE: ghcr.io/${{ inputs.owner }}/${{ matrix.release.image }}:candidate-${{ github.run_id }}-${{ github.run_attempt }}
+      volumes:
+        - dind-certs-client:/certs/client:ro
+
+    services:
+      docker:
+        image: dhi.io/docker-dind:29-alpine-dev
+        credentials:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+        env:
+          DOCKER_TLS_CERTDIR: /certs
+        volumes:
+          - dind-certs-ca:/certs/ca
+          - dind-certs-client:/certs/client
+          - dind-data:/var/lib/docker
+        options: >-
+          --privileged
+          --health-cmd "docker info"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 3
+
+    steps:
+      - name: Verify Docker daemon
+        run: docker info
+
+      - name: Login to GHCR
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "${{ github.actor }}" --password-stdin
+
+      - name: Pull candidate image
+        run: docker pull "$TEST_IMAGE"
+
+      - name: Execute image tests
+        run: ./run-tests.sh
+
+      - name: Logout from GHCR
+        if: always()
+        run: docker logout ghcr.io || true
+
+  scan:
+    name: Scan ${{ matrix.release.image }} (${{ matrix.platform }})
+    needs: [build, test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    permissions:
+      packages: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        release: ${{ fromJson(inputs.matrix || '[]') }}
+        platform:
+          - linux/amd64
+
+    steps:
+      - name: Set image names
+        id: image
+        run: .github/scripts/set-image-names.sh "${{ inputs.owner }}" "${{ matrix.release.image }}"
+
+      - name: Login to GHCR
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Scan candidate image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        env:
+          TRIVY_PLATFORM: ${{ matrix.platform }}
+        with:
+          image-ref: ${{ steps.image.outputs.name }}:${{ steps.image.outputs.candidate }}
+          format: table
+          vuln-type: os
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+
+  publish:
+    name: Publish ${{ matrix.release.image }}
+    needs: [build, test, scan]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    permissions:
+      packages: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        release: ${{ fromJson(inputs.matrix || '[]') }}
+
+    steps:
+      - name: Set image names
+        id: image
+        run: .github/scripts/set-image-names.sh "${{ inputs.owner }}" "${{ matrix.release.image }}"
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Login to GHCR
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+
+      - name: Promote scanned image
+        env:
+          IMAGE: ${{ steps.image.outputs.name }}
+          CANDIDATE: ${{ steps.image.outputs.candidate }}
+          RELEASE: ${{ matrix.release.tag }}
+        run: |
+          docker buildx imagetools create --tag "${IMAGE}:${RELEASE}" "${IMAGE}:${CANDIDATE}"
+          echo "Published ${IMAGE}:${RELEASE}"
