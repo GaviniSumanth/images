@@ -54,8 +54,7 @@ matrix=$(jq -cn \
       tag: $r.version,
       containerfile: $r.containerfile,
       image: $r.image,
-      test_context: $test_dir,
-      testfile: ($test_dir + "/Containerfile")
+      test_context: $test_dir
     }
   )
   ')
