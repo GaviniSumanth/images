@@ -53,6 +53,7 @@ USER root
 ENV GOSU_VERSION=1.14
 RUN set -eux; \
     apk add --no-cache bash curl tzdata ca-certificates dpkg gnupg musl-utils; \
+    install -d /usr/local/bin; \
     dpkgArch="$(dpkg --print-architecture | awk -F- '{ print $NF }')"; \
     curl --fail --show-error --location --retry 5 --retry-all-errors --retry-delay 2 \
         "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-$dpkgArch" \
