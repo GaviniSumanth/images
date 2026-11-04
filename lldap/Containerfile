@@ -50,57 +50,9 @@ RUN set -eux; \
 FROM dhi.io/rust:1-alpine-dev AS runtime-deps
 
 USER root
-ENV GOSU_VERSION=1.14
 RUN set -eux; \
-    apk add --no-cache bash curl tzdata ca-certificates dpkg gnupg musl-utils; \
-    install -d /usr/local/bin; \
-    dpkgArch="$(dpkg --print-architecture | awk -F- '{ print $NF }')"; \
-    curl --fail --show-error --location --retry 5 --retry-all-errors --retry-delay 2 \
-        "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-$dpkgArch" \
-        --output /usr/local/bin/gosu; \
-    curl --fail --show-error --location --retry 5 --retry-all-errors --retry-delay 2 \
-        "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-$dpkgArch.asc" \
-        --output /usr/local/bin/gosu.asc; \
-    export GNUPGHOME="$(mktemp -d)"; \
-    gpg --batch --keyserver hkps://keys.openpgp.org --recv-keys B42F6819007F00F88E364FD4036A9C25BF357DD4; \
-    gpg --batch --verify /usr/local/bin/gosu.asc /usr/local/bin/gosu; \
-    command -v gpgconf && gpgconf --kill all || :; \
-    rm -rf "$GNUPGHOME" /usr/local/bin/gosu.asc; \
-    chmod +x /usr/local/bin/gosu; \
-    gosu --version; \
-    gosu nobody true
-
-RUN set -eux; \
-    install -d -o 1000 -g 1000 /runtime-root/app /runtime-root/data; \
-    \
-    copy_binary() { \
-        binary="$1"; \
-        destination="/runtime-root${binary}"; \
-        mkdir -p "$(dirname "${destination}")"; \
-        cp -L "${binary}" "${destination}"; \
-        ldd "${binary}" > /tmp/ldd-output; \
-        if grep -q "not found" /tmp/ldd-output; then \
-            cat /tmp/ldd-output; \
-            exit 1; \
-        fi; \
-        awk '{ \
-            if ($2 == "=>" && $3 ~ /^\//) { \
-                print $3; \
-            } else if ($1 ~ /^\//) { \
-                print $1; \
-            } \
-        }' /tmp/ldd-output | sort -u | while IFS= read -r path; do \
-            case "${path}" in \
-                /lib/ld-musl-*.so.1|/lib/libc.musl-*.so.1) ;; \
-                /*) \
-                    mkdir -p "/runtime-root$(dirname "${path}")"; \
-                    cp -L "${path}" "/runtime-root${path}"; \
-                    ;; \
-            esac; \
-        done; \
-    }; \
-    copy_binary /bin/bash; \
-    install -D /usr/local/bin/gosu /runtime-root/usr/local/bin/gosu; \
+    apk add --no-cache tzdata ca-certificates; \
+    install -d -o 1000 -g 1000 /runtime-root/data; \
     cp -a /usr/share/zoneinfo /runtime-root/usr/share/; \
     install -D /etc/ssl/certs/ca-certificates.crt /runtime-root/etc/ssl/certs/ca-certificates.crt
 
@@ -114,16 +66,14 @@ COPY --from=builder --chown=1000:1000 /app/app/index_local.html app/index.html
 COPY --from=builder --chown=1000:1000 /app/app/static app/static
 COPY --from=builder --chown=1000:1000 /app/app/pkg app/pkg
 COPY --from=builder --chown=1000:1000 /app/target/release/lldap /app/target/release/lldap_migration_tool /app/target/release/lldap_set_password ./
-COPY --from=builder --chown=1000:1000 /app/docker-entrypoint.sh /app/lldap_config.docker_template.toml /app/scripts/bootstrap.sh ./
+COPY --from=builder --chown=1000:1000 /app/lldap_config.docker_template.toml /data/lldap_config.toml
 
 ENV LDAP_PORT=3890
-ENV HTTP_PORT=17170 \
-    UID=1000 \
-    GID=1000
+ENV HTTP_PORT=17170
 
 EXPOSE ${LDAP_PORT} ${HTTP_PORT}
 
 USER 1000:1000
 
-ENTRYPOINT ["/app/docker-entrypoint.sh"]
+ENTRYPOINT ["/app/lldap"]
 CMD ["run", "--config-file", "/data/lldap_config.toml"]
