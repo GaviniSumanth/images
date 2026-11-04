@@ -1,0 +1,130 @@
+# Build image
+FROM dhi.io/rust:1-alpine-dev AS chef
+
+RUN set -x \
+    # Add user
+    && addgroup --gid 10001 app \
+    && adduser --disabled-password \
+        --gecos '' \
+        --ingroup app \
+        --home /app \
+        --uid 10001 \
+        app \
+    # Install required packages
+    && apk add openssl-dev musl-dev make perl curl gzip rustup
+
+USER app
+WORKDIR /app
+
+ENV PATH="/app/.cargo/bin:${PATH}"
+
+RUN set -x \
+    # Install build tools
+    && rustup-init -y --profile minimal --default-toolchain stable --target wasm32-unknown-unknown \
+    && RUSTFLAGS=-Ctarget-feature=-crt-static cargo install wasm-pack cargo-chef
+
+# Prepare the dependency list.
+FROM chef AS planner
+COPY . .
+RUN cargo chef prepare --recipe-path /tmp/recipe.json
+
+# Build dependencies.
+FROM chef AS builder
+COPY --from=planner /tmp/recipe.json recipe.json
+RUN cargo chef cook --release -p lldap_app --target wasm32-unknown-unknown \
+    && cargo chef cook --release -p lldap \
+    && cargo chef cook --release -p lldap_migration_tool \
+    && cargo chef cook --release -p lldap_set_password
+
+# Copy the source and build the app and server.
+COPY --chown=app:app . .
+RUN cargo build --release -p lldap -p lldap_migration_tool -p lldap_set_password \
+    # Build the frontend.
+    && ./app/build.sh
+
+RUN set -eux; \
+    for file in $(cat app/static/libraries.txt); do wget -P app/static "$file"; done; \
+    for file in $(cat app/static/fonts/fonts.txt); do wget -P app/static/fonts "$file"; done; \
+    chmod a+r -R .
+
+FROM dhi.io/rust:1-alpine-dev AS runtime-deps
+
+USER root
+ENV GOSU_VERSION=1.14
+RUN set -eux; \
+    apk add --no-cache bash curl tzdata ca-certificates dpkg gnupg musl-utils; \
+    dpkgArch="$(dpkg --print-architecture | awk -F- '{ print $NF }')"; \
+    curl --fail --show-error --location --retry 5 --retry-all-errors --retry-delay 2 \
+        "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-$dpkgArch" \
+        --output /usr/local/bin/gosu; \
+    curl --fail --show-error --location --retry 5 --retry-all-errors --retry-delay 2 \
+        "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-$dpkgArch.asc" \
+        --output /usr/local/bin/gosu.asc; \
+    export GNUPGHOME="$(mktemp -d)"; \
+    gpg --batch --keyserver hkps://keys.openpgp.org --recv-keys B42F6819007F00F88E364FD4036A9C25BF357DD4; \
+    gpg --batch --verify /usr/local/bin/gosu.asc /usr/local/bin/gosu; \
+    command -v gpgconf && gpgconf --kill all || :; \
+    rm -rf "$GNUPGHOME" /usr/local/bin/gosu.asc; \
+    chmod +x /usr/local/bin/gosu; \
+    gosu --version; \
+    gosu nobody true
+
+RUN set -eux; \
+    install -d /runtime-root; \
+    \
+    copy_binary() { \
+        binary="$1"; \
+        destination="/runtime-root${binary}"; \
+        mkdir -p "$(dirname "${destination}")"; \
+        cp -L "${binary}" "${destination}"; \
+        ldd "${binary}" > /tmp/ldd-output; \
+        if grep -q "not found" /tmp/ldd-output; then \
+            cat /tmp/ldd-output; \
+            exit 1; \
+        fi; \
+        awk '{ \
+            if ($2 == "=>" && $3 ~ /^\//) { \
+                print $3; \
+            } else if ($1 ~ /^\//) { \
+                print $1; \
+            } \
+        }' /tmp/ldd-output | sort -u | while IFS= read -r path; do \
+            case "${path}" in \
+                /lib/ld-musl-*.so.1|/lib/libc.musl-*.so.1) ;; \
+                /*) \
+                    mkdir -p "/runtime-root$(dirname "${path}")"; \
+                    cp -L "${path}" "/runtime-root${path}"; \
+                    ;; \
+            esac; \
+        done; \
+    }; \
+    copy_binary /bin/bash; \
+    install -D /usr/local/bin/gosu /runtime-root/usr/local/bin/gosu; \
+    cp -a /usr/share/zoneinfo /runtime-root/usr/share/; \
+    install -D /etc/ssl/certs/ca-certificates.crt /runtime-root/etc/ssl/certs/ca-certificates.crt
+
+# Final image
+FROM dhi.io/static:20261020-alpine AS runtime
+
+WORKDIR /app
+
+COPY --from=runtime-deps /runtime-root/ /
+COPY --from=builder --chown=1000:1000 /app/app/index_local.html app/index.html
+COPY --from=builder --chown=1000:1000 /app/app/static app/static
+COPY --from=builder --chown=1000:1000 /app/app/pkg app/pkg
+COPY --from=builder --chown=1000:1000 /app/target/release/lldap /app/target/release/lldap_migration_tool /app/target/release/lldap_set_password ./
+COPY --from=builder --chown=1000:1000 /app/docker-entrypoint.sh /app/lldap_config.docker_template.toml /app/scripts/bootstrap.sh ./
+
+ENV LDAP_PORT=3890
+ENV HTTP_PORT=17170 \
+    UID=1000 \
+    GID=1000
+
+EXPOSE ${LDAP_PORT} ${HTTP_PORT}
+
+USER 0:0
+RUN mkdir -p /data && chown 1000:1000 /data /app
+USER 1000:1000
+
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
+CMD ["run", "--config-file", "/data/lldap_config.toml"]

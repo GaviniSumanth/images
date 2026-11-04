@@ -73,10 +73,12 @@ COPY --from=compile-server /server/dist-server ./dist-server
 RUN set -eux; \
     case "${TARGETPLATFORM}" in \
         "linux/amd64") \
-            LIBRARY_URL="https://github.com/mikiher/nunicode-sqlite/releases/download/v1.2/libnusqlite3-linux-musl-x64.zip" \
+            LIBRARY_URL="https://github.com/mikiher/nunicode-binaries/releases/download/v1.2/libnusqlite3-linux-musl-x64.zip"; \
+            LIBRARY_SHA256="6fdd092b6ba471d9bd1d5c3b01da4ca2bd84f41b03c91ccc0db6d75f1d97e52d" \
             ;; \
         "linux/arm64") \
-            LIBRARY_URL="https://github.com/mikiher/nunicode-sqlite/releases/download/v1.2/libnusqlite3-linux-musl-arm64.zip" \
+            LIBRARY_URL="https://github.com/mikiher/nunicode-binaries/releases/download/v1.2/libnusqlite3-linux-musl-arm64.zip"; \
+            LIBRARY_SHA256="91e2fc92e473f07c59df9b430e6ff120e1b56cd9a6317e61ea123259669788a7" \
             ;; \
         *) \
             echo "Unsupported platform: ${TARGETPLATFORM}"; \
@@ -84,9 +86,10 @@ RUN set -eux; \
             ;; \
     esac; \
     mkdir -p "${NUSQLITE3_DIR}"; \
-    curl --fail --show-error --location --retry 3 \
+    curl --fail --show-error --location --retry 5 --retry-all-errors --retry-delay 2 \
         "${LIBRARY_URL}" \
         --output /tmp/library.zip; \
+    echo "${LIBRARY_SHA256}  /tmp/library.zip" | sha256sum -c -; \
     unzip /tmp/library.zip -d "${NUSQLITE3_DIR}"; \
     rm -f /tmp/library.zip; \
     test -f "${NUSQLITE3_DIR}/libnusqlite3.so"
@@ -224,4 +227,8 @@ COPY --from=build-server \
 
 EXPOSE 8000
 
+USER 1000:1000
+
 CMD ["node", "dist-server/index.js"]
+HEALTHCHECK --interval=30s --timeout=20s --start-period=1m --retries=3 \
+    CMD ["node", "-e", "fetch('http://127.0.0.1:8000/healthcheck').then(response => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"]

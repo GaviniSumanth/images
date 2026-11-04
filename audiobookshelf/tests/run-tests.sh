@@ -1,5 +1,5 @@
-#!/bin/sh
-set -eu
+#!/usr/bin/env bash
+set -euo pipefail
 
 CONTAINER_NAME="audiobookshelf-test-${GITHUB_RUN_ID:-local}"
 TEST_VOLUME="audiobookshelf-tests-${GITHUB_RUN_ID:-local}"
@@ -12,9 +12,11 @@ cleanup() {
 
 trap cleanup EXIT INT TERM
 
+. "$(dirname "$0")/../../_shared/container-test-common.sh"
+
 echo "Testing candidate image: $TEST_IMAGE"
 
-docker info >/dev/null
+check_image_user "$TEST_IMAGE" "1000:1000"
 
 # --------------------------------------------------
 # Prepare test files
@@ -53,22 +55,20 @@ docker run -d \
   -p "${PORT}:8000" \
   "$TEST_IMAGE"
 
-echo "Waiting for AudioBookShelf health endpoint..."
+echo "Waiting for AudioBookShelf container health status..."
 
 HEALTHY=false
 
 for i in $(seq 1 60); do
-  if docker run --rm \
-    --network host \
-    curlimages/curl:latest \
-    --fail --silent --show-error \
-    "http://127.0.0.1:${PORT}/healthcheck" >/dev/null 2>&1; then
+  STATUS=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}missing{{end}}' "$CONTAINER_NAME")
+
+  if [ "$STATUS" = "healthy" ]; then
     HEALTHY=true
     break
   fi
 
-  if [ "$(docker inspect -f '{{.State.Running}}' "$CONTAINER_NAME")" != "true" ]; then
-    echo "AudioBookShelf container exited unexpectedly"
+  if [ "$STATUS" = "unhealthy" ]; then
+    echo "AudioBookShelf container health check failed"
     docker logs "$CONTAINER_NAME"
     exit 1
   fi
@@ -77,11 +77,11 @@ for i in $(seq 1 60); do
 done
 
 if [ "$HEALTHY" != "true" ]; then
-  echo "AudioBookShelf health check failed"
+  echo "AudioBookShelf container health check timed out"
   docker logs "$CONTAINER_NAME"
   exit 1
 fi
 
-echo "AudioBookShelf health check passed!"
+echo "AudioBookShelf container health check passed!"
 
 echo "All image tests passed!"

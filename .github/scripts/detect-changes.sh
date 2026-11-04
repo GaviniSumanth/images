@@ -45,6 +45,7 @@ matrix=$(jq -cn \
       $o.image != $r.image or
       ($changed | index($r.containerfile)) != null or
       ($changed | index($o.containerfile // "")) != null or
+      any($changed[]; startswith("_shared/")) or
       ($changed | index(".github/workflows/build-container.yml")) != null or
       any($changed[]; startswith($test_dir + "/"))
     ) |

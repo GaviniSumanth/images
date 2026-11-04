@@ -5,6 +5,18 @@
       "version": "v2.37.2",
       "containerfile": "audiobookshelf/Containerfile",
       "image": "audiobookshelf"
+    },
+    {
+      "repository": "lldap/lldap",
+      "version": "v0.6.3",
+      "containerfile": "lldap/Containerfile",
+      "image": "lldap"
+    },
+    {
+      "repository": "authelia/authelia",
+      "version": "v4.39.28",
+      "containerfile": "authelia/Containerfile",
+      "image": "authelia"
     }
   ]
 }
