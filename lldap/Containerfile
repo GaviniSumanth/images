@@ -53,6 +53,7 @@ USER root
 RUN set -eux; \
     apk add --no-cache tzdata ca-certificates; \
     install -d -o 1000 -g 1000 /runtime-root/data; \
+    install -d /runtime-root/usr/share; \
     cp -a /usr/share/zoneinfo /runtime-root/usr/share/; \
     install -D /etc/ssl/certs/ca-certificates.crt /runtime-root/etc/ssl/certs/ca-certificates.crt
 
