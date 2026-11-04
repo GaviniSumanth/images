@@ -71,7 +71,7 @@ RUN set -eux; \
     gosu nobody true
 
 RUN set -eux; \
-    install -d /runtime-root; \
+    install -d -o 1000 -g 1000 /runtime-root/app /runtime-root/data; \
     \
     copy_binary() { \
         binary="$1"; \
@@ -123,8 +123,6 @@ ENV HTTP_PORT=17170 \
 
 EXPOSE ${LDAP_PORT} ${HTTP_PORT}
 
-USER 0:0
-RUN mkdir -p /data && chown 1000:1000 /data /app
 USER 1000:1000
 
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
