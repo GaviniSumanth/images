@@ -92,6 +92,25 @@ def test_build_workflow_passes_both_matrices():
     assert "verify_matrix" in text
 
 
+def test_detect_reconciles_unpublished_verify_entries():
+    detect = workflow("build-container.yml")["jobs"]["detect"]
+    assert detect["outputs"]["build_matrix"] == (
+        "${{ steps.reconcile.outputs.build_matrix }}"
+    )
+    assert detect["outputs"]["verify_matrix"] == (
+        "${{ steps.reconcile.outputs.verify_matrix }}"
+    )
+
+    step = next(
+        step
+        for step in detect["steps"]
+        if step.get("name") == "Reconcile unpublished verify entries"
+    )
+    assert "reconcile_verify.py" in step["run"]
+    assert step["env"]["BUILD_MATRIX"] == "${{ steps.changes.outputs.build_matrix }}"
+    assert step["env"]["VERIFY_MATRIX"] == "${{ steps.changes.outputs.verify_matrix }}"
+
+
 def test_unit_tests_run_before_dispatch():
     text = (WORKFLOW_DIR / "build-container.yml").read_text(encoding="utf-8")
     assert "pytest" in text

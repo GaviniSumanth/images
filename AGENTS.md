@@ -167,6 +167,12 @@ A new image or a changed upstream repository URL builds that image. A force
 push or unreadable previous configuration rebuilds everything. Keep this
 behavior; it prevents stale images being left behind.
 
+Before dispatch, `reconcile_verify.py` checks each verify entry's published
+`vX.Y.Z` alias in GHCR. An entry whose alias is missing (for example because an
+earlier build failed before publish) is promoted to the build matrix and
+rebuilt instead of being verified. Registry or authentication errors fail the
+detection job closed.
+
 ## Containerfile conventions
 
 - Start with the repository's pinned `# syntax=docker/dockerfile:1@sha256:...`

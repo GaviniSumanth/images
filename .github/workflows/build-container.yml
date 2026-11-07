@@ -31,8 +31,8 @@ jobs:
     timeout-minutes: 10
 
     outputs:
-      build_matrix: ${{ steps.changes.outputs.build_matrix }}
-      verify_matrix: ${{ steps.changes.outputs.verify_matrix }}
+      build_matrix: ${{ steps.reconcile.outputs.build_matrix }}
+      verify_matrix: ${{ steps.reconcile.outputs.verify_matrix }}
       owner: ${{ steps.meta.outputs.owner }}
 
     steps:
@@ -66,6 +66,16 @@ jobs:
           BEFORE: ${{ github.event.before }}
           CURRENT: ${{ github.sha }}
         run: python3 .github/scripts/detect_changes.py
+
+      - name: Reconcile unpublished verify entries
+        id: reconcile
+        env:
+          BUILD_MATRIX: ${{ steps.changes.outputs.build_matrix }}
+          VERIFY_MATRIX: ${{ steps.changes.outputs.verify_matrix }}
+          OWNER: ${{ steps.meta.outputs.owner }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 .github/scripts/reconcile_verify.py
 
   dispatch:
     name: Run Container Pipeline

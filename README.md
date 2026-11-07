@@ -31,7 +31,10 @@ source of truth.
 
 `build-container.yml` validates the release configuration, runs the offline unit
 tests, and calculates two matrices: images that need a rebuild and images whose
-existing release only needs verification.
+existing release only needs verification. Before dispatch, it checks each
+verify entry's published alias in GHCR; if the alias is missing (for example
+because an earlier build failed before publish), that image is moved to the
+build matrix and rebuilt instead of being verified.
 
 `container-pipeline.yml` runs a pre-build validation test for every image, then
 builds each changed image once into an OCI archive. The matrix selects an
