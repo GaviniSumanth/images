@@ -131,7 +131,11 @@ scripts, and on manual dispatch.
    comes from `build/`. The job validates the exact upstream tag, runs the
    matrix-selected pre-build validation suite for the image, and builds
    `linux/amd64` once into an OCI archive with `APP_VERSION`, `APP_REVISION`,
-   SBOM, and provenance. It never pushes. A per-image pre-build test may live in
+   SBOM, and provenance. Before upload, `normalize_oci_archive.py` adds skopeo's
+   `io.github.containers.compression.zstd` annotation to index descriptors for
+   images with zstd layers; without it, older skopeo versions rewrite the index
+   and `skopeo copy --preserve-digests` refuses to publish. It never pushes. A
+   per-image pre-build test may live in
    `tests/containerfiles/test_<image>_prebuild.py`; the matrix selects it when
    present and otherwise runs the generic `tests/containerfiles/test_prebuild.py`.
    Do not add image-name conditionals to workflows.

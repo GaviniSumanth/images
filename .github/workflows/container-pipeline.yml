@@ -105,6 +105,11 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.release.image }}
           cache-to: type=gha,mode=max,scope=${{ matrix.release.image }}
 
+      - name: Normalize image archive
+        env:
+          OCI_ARCHIVE: ${{ runner.temp }}/${{ steps.image.outputs.artifact }}.oci.tar
+        run: python3 build/.github/scripts/normalize_oci_archive.py
+
       - name: Upload image archive
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

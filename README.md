@@ -40,8 +40,10 @@ build matrix and rebuilt instead of being verified.
 builds each changed image once into an OCI archive. The matrix selects an
 optional `tests/containerfiles/test_<image>_prebuild.py` file and falls back to
 the generic `tests/containerfiles/test_prebuild.py`; the workflow does not branch
-on image names. The archive is uploaded as an artifact and then loaded for
-integration tests and a Trivy OS-package scan. Only after both pass is the same
+on image names. Before upload, the archive is normalized so that skopeo's zstd
+compression annotation is already present and `--preserve-digests` can publish
+the tested index unchanged. The archive is uploaded as an artifact and then
+loaded for integration tests and a Trivy OS-package scan. Only after both pass is the same
 archive pushed to GHCR with `skopeo`, preserving its digest. No candidate tags
 are published.
 

@@ -80,6 +80,22 @@ def test_build_produces_an_oci_archive():
     assert "actions/download-artifact@" in text
 
 
+def test_build_normalizes_the_archive_before_upload():
+    steps = workflow("container-pipeline.yml")["jobs"]["build"]["steps"]
+    names = [step.get("name") for step in steps]
+
+    build = names.index("Build image archive")
+    normalize = names.index("Normalize image archive")
+    upload = names.index("Upload image archive")
+    assert build < normalize < upload
+
+    step = steps[normalize]
+    assert "normalize_oci_archive.py" in step["run"]
+    assert step["env"]["OCI_ARCHIVE"] == (
+        "${{ runner.temp }}/${{ steps.image.outputs.artifact }}.oci.tar"
+    )
+
+
 def test_publish_uses_the_tested_archive():
     text = (WORKFLOW_DIR / "container-pipeline.yml").read_text(encoding="utf-8")
     assert "publish_image.py" in text
