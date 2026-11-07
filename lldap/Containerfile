@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
 
 # Build image
-FROM dhi.io/rust:1-alpine-dev AS chef
+FROM dhi.io/rust:1-alpine-dev@sha256:e4c9ccbceaf78cf72ec14234f32311b3afa80ac37f0e177537bd7cd5a81d124b AS chef
 
 RUN set -x \
     # Add user
@@ -52,7 +52,7 @@ RUN set -eux; \
 # Build a minimal init helper that seeds the config on first start.
 # This keeps the runtime image free of a shell while preserving the
 # upstream behaviour for empty bind-mounted /data directories.
-FROM dhi.io/golang:1.27.3-alpine-dev AS entrypoint
+FROM dhi.io/golang:1.27.3-alpine-dev@sha256:f6fe351ecd427d8b75d4dbebd5573fb2fd2e1df2bf678cc33d1d83f1bbcfd288 AS entrypoint
 
 WORKDIR /src
 
@@ -106,7 +106,7 @@ EOF
 RUN go mod init lldap-entrypoint \
     && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/lldap-entrypoint .
 
-FROM dhi.io/rust:1-alpine-dev AS runtime-deps
+FROM dhi.io/rust:1-alpine-dev@sha256:e4c9ccbceaf78cf72ec14234f32311b3afa80ac37f0e177537bd7cd5a81d124b AS runtime-deps
 
 USER root
 RUN set -eux; \
@@ -117,7 +117,7 @@ RUN set -eux; \
     install -D /etc/ssl/certs/ca-certificates.crt /runtime-root/etc/ssl/certs/ca-certificates.crt
 
 # Final image
-FROM dhi.io/static:20261020-alpine AS runtime
+FROM dhi.io/static:20261020-alpine@sha256:c78b2c2034b3fb2f83a337b6353c3ef27d910a828d9127ff342014e7b225c04e AS runtime
 
 WORKDIR /app
 
