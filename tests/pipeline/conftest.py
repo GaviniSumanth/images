@@ -20,8 +20,10 @@ def github_output(tmp_path):
 def script_env(github_output):
     env = os.environ.copy()
     env["GITHUB_OUTPUT"] = str(github_output)
-    env.setdefault("GITHUB_RUN_NUMBER", "42")
-    env.setdefault("GITHUB_RUN_ATTEMPT", "1")
+    # Force deterministic values: CI exports real GITHUB_RUN_* variables, and
+    # tests that need other values override them through run_script(env=...).
+    env["GITHUB_RUN_NUMBER"] = "42"
+    env["GITHUB_RUN_ATTEMPT"] = "1"
     return env
 
 
