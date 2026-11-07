@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
 
-FROM node:26-alpine AS frontend
+FROM dhi.io/node:26-alpine-dev AS frontend
 
 WORKDIR /src
 
@@ -11,11 +11,14 @@ COPY web/ ./web/
 RUN pnpm --dir web install --frozen-lockfile --ignore-scripts \
     && pnpm --dir web build
 
-FROM golang:1.27.1-alpine AS builder
+FROM dhi.io/golang:1.27.1-alpine-dev AS builder
+
+ARG APP_VERSION=unknown
+ARG APP_REVISION=unknown
 
 WORKDIR /src
 
-RUN apk add --no-cache build-base
+RUN apk add --no-cache build-base musl-utils
 
 COPY go.mod go.sum ./
 
@@ -34,7 +37,10 @@ RUN cp -a api/. ./internal/server/public_html/api/ \
             -buildmode=pie \
             -trimpath \
             -o /out/authelia \
-            -ldflags "-linkmode=external -s -w" \
+            -ldflags "-linkmode=external -s -w \
+                -X github.com/authelia/authelia/v4/internal/utils.BuildTag=${APP_VERSION} \
+                -X 'github.com/authelia/authelia/v4/internal/utils.BuildState=tagged clean' \
+                -X github.com/authelia/authelia/v4/internal/utils.BuildCommit=${APP_REVISION}" \
             ./cmd/authelia/
 
 RUN set -eux; \

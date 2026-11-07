@@ -1,0 +1,24 @@
+[project]
+name = "container-images"
+version = "0.0.0"
+description = "Hardened OCI images built from upstream release tags"
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = [
+  "tests/pipeline",
+  "tests/containerfiles",
+]
+pythonpath = [
+  ".github/scripts",
+  "tests",
+  "tests/containerfiles",
+  "tests/images",
+]
+addopts = "-ra --strict-markers"
+markers = [
+  "unit: fast tests that do not require Docker or network access",
+  "integration: tests that run against a built image",
+  "upstream: tests that read an upstream source checkout",
+]

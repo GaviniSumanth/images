@@ -7,7 +7,9 @@ on:
     paths:
       - releases.json
       - "**/Containerfile"
-      - "**/tests/**"
+      - "**/Containerfile.dockerignore"
+      - pyproject.toml
+      - "tests/**"
       - .github/workflows/build-container.yml
       - .github/workflows/container-pipeline.yml
       - .github/scripts/**
@@ -26,10 +28,11 @@ jobs:
   detect:
     name: Detect changed releases
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
 
     outputs:
-      matrix: ${{ steps.changes.outputs.matrix }}
+      build_matrix: ${{ steps.changes.outputs.build_matrix }}
+      verify_matrix: ${{ steps.changes.outputs.verify_matrix }}
       owner: ${{ steps.meta.outputs.owner }}
 
     steps:
@@ -43,24 +46,34 @@ jobs:
         id: meta
         env:
           OWNER: ${{ github.repository_owner }}
-        run: echo "owner=$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+        run: python3 .github/scripts/normalize_owner.py
 
       - name: Validate release configuration
-        run: bash .github/scripts/validate-releases.sh
+        run: python3 .github/scripts/validate_releases.py
+
+      - name: Validate image configuration
+        run: python3 .github/scripts/validate_images.py
+
+      - name: Install test dependencies
+        run: python3 -m pip install --disable-pip-version-check -r tests/requirements-test.txt
+
+      - name: Run pipeline unit tests
+        run: python3 -m pytest -m unit
 
       - name: Detect changed releases
         id: changes
-        run: |
-          matrix_output=$(bash .github/scripts/detect-changes.sh "${{ github.event.before }}" "${{ github.sha }}")
-          echo "$matrix_output" >> "$GITHUB_OUTPUT"
-          echo "Build matrix: $(echo "$matrix_output" | cut -d'=' -f2-)"
+        env:
+          BEFORE: ${{ github.event.before }}
+          CURRENT: ${{ github.sha }}
+        run: python3 .github/scripts/detect_changes.py
 
   dispatch:
     name: Run Container Pipeline
     needs: detect
-    if: needs.detect.outputs.matrix != '[]'
+    if: needs.detect.outputs.build_matrix != '[]' || needs.detect.outputs.verify_matrix != '[]'
     uses: ./.github/workflows/container-pipeline.yml
     with:
-      matrix: ${{ needs.detect.outputs.matrix }}
+      build_matrix: ${{ needs.detect.outputs.build_matrix }}
+      verify_matrix: ${{ needs.detect.outputs.verify_matrix }}
       owner: ${{ needs.detect.outputs.owner }}
     secrets: inherit

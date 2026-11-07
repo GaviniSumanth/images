@@ -3,7 +3,10 @@ name: Container Pipeline
 on:
   workflow_call:
     inputs:
-      matrix:
+      build_matrix:
+        required: true
+        type: string
+      verify_matrix:
         required: true
         type: string
       owner:
@@ -18,17 +21,18 @@ on:
 jobs:
   build:
     name: Build ${{ matrix.release.image }}
+    if: inputs.build_matrix != '[]'
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
     permissions:
       contents: read
-      packages: write
+      packages: read
 
     strategy:
       fail-fast: false
       matrix:
-        release: ${{ fromJson(inputs.matrix || '[]') }}
+        release: ${{ fromJson(inputs.build_matrix || '[]') }}
 
     steps:
       - name: Checkout build repository
@@ -45,27 +49,35 @@ jobs:
           path: source
           persist-credentials: false
 
-      - name: Get upstream revision
-        id: upstream
-        working-directory: source
-        run: echo "revision=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Validate upstream tag
+        run: python3 build/.github/scripts/validate_upstream_tags.py "${{ matrix.release.image }}"
+
+      - name: Install pre-build test dependency
+        run: python3 -m pip install --disable-pip-version-check pytest==9.2.0
+
+      - name: Run pre-build validation tests
+        env:
+          UPSTREAM_SOURCE: ${{ github.workspace }}/source
+          UPSTREAM_DOCKERFILE: ${{ github.workspace }}/source/Dockerfile
+        working-directory: build
+        run: python3 -m pytest -v "${{ matrix.release.prebuild_test }}"
+
+      - name: Prepare image metadata
+        id: metadata
+        env:
+          RELEASE_METADATA: ${{ toJson(matrix.release.metadata) }}
+          UPSTREAM_VERSION: ${{ matrix.release.tag }}
+          UPSTREAM_SOURCE: source
+          CONTAINER_SOURCE: ${{ github.server_url }}/${{ github.repository }}
+          CONTAINER_VENDOR: ${{ github.repository_owner }}
+        run: python3 build/.github/scripts/prepare_metadata.py
 
       - name: Set image names
         id: image
-        run: build/.github/scripts/set-image-names.sh "${{ inputs.owner }}" "${{ matrix.release.image }}"
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
+        run: python3 build/.github/scripts/set_image_names.py "${{ inputs.owner }}" "${{ matrix.release.image }}" "${{ matrix.release.tag }}"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
-
-      - name: Login to GHCR
-        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Login to Docker Hardened Images
         uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4
@@ -74,45 +86,48 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push candidate image
+      - name: Build image archive
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
           context: ./source
           file: ./build/${{ matrix.release.containerfile }}
           platforms: linux/amd64
-          push: true
-          pull: true
-          tags: ${{ steps.image.outputs.name }}:${{ steps.image.outputs.candidate }}
-          labels: |
-            org.opencontainers.image.title=${{ matrix.release.image }}
-            org.opencontainers.image.source=https://github.com/${{ matrix.release.repo }}
-            org.opencontainers.image.version=${{ matrix.release.tag }}
-            org.opencontainers.image.revision=${{ steps.upstream.outputs.revision }}
+          push: false
+          load: false
+          outputs: type=oci,dest=${{ runner.temp }}/${{ steps.image.outputs.artifact }}.oci.tar
+          build-args: |
+            APP_VERSION=${{ matrix.release.tag }}
+            APP_REVISION=${{ steps.metadata.outputs.revision }}
+          labels: ${{ steps.metadata.outputs.labels }}
+          annotations: ${{ steps.metadata.outputs.annotations }}
           provenance: mode=max
           sbom: true
           cache-from: type=gha,scope=${{ matrix.release.image }}
           cache-to: type=gha,mode=max,scope=${{ matrix.release.image }}
 
-      - name: Validate test configuration
-        run: build/.github/scripts/validate-test-config.sh "${{ matrix.release.test_context }}"
+      - name: Upload image archive
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ steps.image.outputs.artifact }}
+          path: ${{ runner.temp }}/${{ steps.image.outputs.artifact }}.oci.tar
+          if-no-files-found: error
+          retention-days: 7
 
   test:
     name: Test ${{ matrix.release.image }}
+    if: inputs.build_matrix != '[]'
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
     permissions:
-      packages: read
       contents: read
-
-    env:
-      TEST_IMAGE: ghcr.io/${{ inputs.owner }}/${{ matrix.release.image }}:candidate-${{ github.run_id }}-${{ github.run_attempt }}
+      packages: read
 
     strategy:
       fail-fast: false
       matrix:
-        release: ${{ fromJson(inputs.matrix || '[]') }}
+        release: ${{ fromJson(inputs.build_matrix || '[]') }}
 
     steps:
       - name: Checkout build repository
@@ -121,25 +136,33 @@ jobs:
           path: build
           persist-credentials: false
 
-      - name: Verify Docker daemon
-        run: docker info
-
-      - name: Login to GHCR
-        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4
+      - name: Download image archive
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          name: image-${{ matrix.release.image }}
+          path: ${{ runner.temp }}/artifacts
 
-      - name: Pull candidate image
-        run: docker pull "$TEST_IMAGE"
+      - name: Install test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y skopeo
+          python3 -m pip install --disable-pip-version-check -r build/tests/requirements-test.txt
+
+      - name: Load image archive
+        env:
+          OCI_ARCHIVE: ${{ runner.temp }}/artifacts/image-${{ matrix.release.image }}.oci.tar
+          TEST_IMAGE: ghcr.io/${{ inputs.owner }}/${{ matrix.release.image }}:test-${{ github.run_id }}-${{ github.run_attempt }}
+        run: python3 build/.github/scripts/load_image.py
 
       - name: Execute image tests
-        run: ./run-tests.sh
-        working-directory: build/${{ matrix.release.test_context }}
+        env:
+          TEST_IMAGE: ghcr.io/${{ inputs.owner }}/${{ matrix.release.image }}:test-${{ github.run_id }}-${{ github.run_attempt }}
+        working-directory: build
+        run: python3 -m pytest -v "${{ matrix.release.test_file }}"
 
   scan:
-    name: Scan ${{ matrix.release.image }} (${{ matrix.platform }})
+    name: Scan ${{ matrix.release.image }}
+    if: inputs.build_matrix != '[]'
     needs: [build, test]
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -151,9 +174,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        release: ${{ fromJson(inputs.matrix || '[]') }}
-        platform:
-          - linux/amd64
+        release: ${{ fromJson(inputs.build_matrix || '[]') }}
 
     steps:
       - name: Checkout build repository
@@ -162,23 +183,27 @@ jobs:
           path: build
           persist-credentials: false
 
-      - name: Set image names
-        id: image
-        run: build/.github/scripts/set-image-names.sh "${{ inputs.owner }}" "${{ matrix.release.image }}"
-
-      - name: Login to GHCR
-        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4
+      - name: Download image archive
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          name: image-${{ matrix.release.image }}
+          path: ${{ runner.temp }}/artifacts
 
-      - name: Scan candidate image
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+      - name: Install skopeo
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y skopeo
+
+      - name: Load image archive
         env:
-          TRIVY_PLATFORM: ${{ matrix.platform }}
+          OCI_ARCHIVE: ${{ runner.temp }}/artifacts/image-${{ matrix.release.image }}.oci.tar
+          TEST_IMAGE: ghcr.io/${{ inputs.owner }}/${{ matrix.release.image }}:scan-${{ github.run_id }}-${{ github.run_attempt }}
+        run: python3 build/.github/scripts/load_image.py
+
+      - name: Scan image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          image-ref: ${{ steps.image.outputs.name }}:${{ steps.image.outputs.candidate }}
+          image-ref: ghcr.io/${{ inputs.owner }}/${{ matrix.release.image }}:scan-${{ github.run_id }}-${{ github.run_attempt }}
           format: table
           vuln-type: os
           severity: CRITICAL,HIGH
@@ -187,6 +212,7 @@ jobs:
 
   publish:
     name: Publish ${{ matrix.release.image }}
+    if: inputs.build_matrix != '[]'
     needs: [build, test, scan]
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -198,7 +224,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        release: ${{ fromJson(inputs.matrix || '[]') }}
+        release: ${{ fromJson(inputs.build_matrix || '[]') }}
 
     steps:
       - name: Checkout build repository
@@ -207,15 +233,20 @@ jobs:
           path: build
           persist-credentials: false
 
+      - name: Download image archive
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: image-${{ matrix.release.image }}
+          path: ${{ runner.temp }}/artifacts
+
+      - name: Install skopeo
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y skopeo
+
       - name: Set image names
         id: image
-        run: build/.github/scripts/set-image-names.sh "${{ inputs.owner }}" "${{ matrix.release.image }}"
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: python3 build/.github/scripts/set_image_names.py "${{ inputs.owner }}" "${{ matrix.release.image }}" "${{ matrix.release.tag }}"
 
       - name: Login to GHCR
         uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4
@@ -224,14 +255,59 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
-
-      - name: Promote scanned image
+      - name: Publish tested image
         env:
+          OCI_ARCHIVE: ${{ runner.temp }}/artifacts/image-${{ matrix.release.image }}.oci.tar
           IMAGE: ${{ steps.image.outputs.name }}
-          CANDIDATE: ${{ steps.image.outputs.candidate }}
-          RELEASE: ${{ matrix.release.tag }}
-        run: |
-          docker buildx imagetools create --tag "${IMAGE}:${RELEASE}" "${IMAGE}:${CANDIDATE}"
-          echo "Published ${IMAGE}:${RELEASE}"
+          RELEASE_TAG: ${{ steps.image.outputs.release_tag }}
+          ALIAS: ${{ steps.image.outputs.alias }}
+          RELEASE_METADATA: ${{ toJson(matrix.release.metadata) }}
+          UPSTREAM_VERSION: ${{ matrix.release.tag }}
+          CONTAINER_SOURCE: ${{ github.server_url }}/${{ github.repository }}
+          CONTAINER_VENDOR: ${{ github.repository_owner }}
+        run: python3 build/.github/scripts/publish_image.py
+
+  verify:
+    name: Verify ${{ matrix.release.image }}
+    if: inputs.verify_matrix != '[]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    permissions:
+      contents: read
+      packages: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        release: ${{ fromJson(inputs.verify_matrix || '[]') }}
+
+    steps:
+      - name: Checkout build repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          path: build
+          persist-credentials: false
+
+      - name: Install test dependencies
+        run: python3 -m pip install --disable-pip-version-check -r build/tests/requirements-test.txt
+
+      - name: Set image names
+        id: image
+        run: python3 build/.github/scripts/set_image_names.py "${{ inputs.owner }}" "${{ matrix.release.image }}" "${{ matrix.release.tag }}"
+
+      - name: Login to GHCR
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull released image
+        run: docker pull "${{ steps.image.outputs.name }}:${{ steps.image.outputs.alias }}"
+
+      - name: Execute image tests
+        env:
+          TEST_IMAGE: ${{ steps.image.outputs.name }}:${{ steps.image.outputs.alias }}
+        working-directory: build
+        run: python3 -m pytest -v "${{ matrix.release.test_file }}"

@@ -108,11 +108,12 @@ FROM ${NODE_BUILD_IMAGE} AS runtime-deps
 
 ARG NUSQLITE3_PATH
 
-# Install FFmpeg and musl dependency inspection utility
+# Install FFmpeg, timezone data, and musl dependency inspection utility
 
 RUN apk add --no-cache \
     ffmpeg \
-    musl-utils
+    musl-utils \
+    tzdata
 
 COPY --from=build-server \
     ${NUSQLITE3_PATH} \
@@ -133,6 +134,8 @@ RUN set -eux; \
 
 RUN set -eux; \
     install -d -o 1000 -g 1000 /runtime-root/config /runtime-root/metadata; \
+    install -d /runtime-root/usr/share; \
+    cp -a /usr/share/zoneinfo /runtime-root/usr/share/; \
     \
     copy_binary() { \
         binary="$1"; \
@@ -230,5 +233,3 @@ EXPOSE 8000
 USER 1000:1000
 
 CMD ["node", "dist-server/index.js"]
-HEALTHCHECK --interval=30s --timeout=20s --start-period=1m --retries=3 \
-    CMD ["node", "-e", "fetch('http://127.0.0.1:8000/healthcheck').then(response => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"]

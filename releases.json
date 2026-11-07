@@ -1,22 +1,56 @@
 {
   "repositories": [
     {
-      "repository": "advplyr/audiobookshelf",
+      "repository": "https://github.com/advplyr/audiobookshelf",
       "version": "v2.37.2",
       "containerfile": "audiobookshelf/Containerfile",
-      "image": "audiobookshelf"
+      "image": "audiobookshelf",
+      "metadata": {
+        "org.opencontainers.image.title": "Audiobookshelf",
+        "org.opencontainers.image.description": "Self-hosted audiobook and podcast server",
+        "org.opencontainers.image.url": "https://audiobookshelf.org/",
+        "org.opencontainers.image.documentation": "https://www.audiobookshelf.org/docs/",
+        "org.opencontainers.image.licenses": "GPL-3.0-only"
+      }
     },
     {
-      "repository": "lldap/lldap",
+      "repository": "https://github.com/lldap/lldap",
       "version": "v0.6.3",
       "containerfile": "lldap/Containerfile",
-      "image": "lldap"
+      "image": "lldap",
+      "metadata": {
+        "org.opencontainers.image.title": "LLDAP",
+        "org.opencontainers.image.description": "Light LDAP implementation",
+        "org.opencontainers.image.url": "https://github.com/lldap/lldap",
+        "org.opencontainers.image.documentation": "https://github.com/lldap/lldap#readme",
+        "org.opencontainers.image.licenses": "GPL-3.0-only"
+      }
     },
     {
-      "repository": "authelia/authelia",
+      "repository": "https://github.com/authelia/authelia",
       "version": "v4.39.28",
       "containerfile": "authelia/Containerfile",
-      "image": "authelia"
+      "image": "authelia",
+      "metadata": {
+        "org.opencontainers.image.title": "Authelia",
+        "org.opencontainers.image.description": "The Single Sign-On Multi-Factor portal for web apps",
+        "org.opencontainers.image.url": "https://www.authelia.com/",
+        "org.opencontainers.image.documentation": "https://www.authelia.com/docs/",
+        "org.opencontainers.image.licenses": "Apache-2.0"
+      }
+    },
+    {
+      "repository": "https://github.com/tarampampam/error-pages",
+      "version": "v4.2.7",
+      "containerfile": "error-pages/Containerfile",
+      "image": "error-pages",
+      "metadata": {
+        "org.opencontainers.image.title": "error-pages",
+        "org.opencontainers.image.description": "HTTP error pages served in HTML, JSON, XML, and plain text formats",
+        "org.opencontainers.image.url": "https://tarampampam.github.io/error-pages/",
+        "org.opencontainers.image.documentation": "https://tarampampam.github.io/error-pages/",
+        "org.opencontainers.image.licenses": "MIT"
+      }
     }
   ]
 }

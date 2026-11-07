@@ -1,0 +1,42 @@
+# syntax=docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+
+FROM dhi.io/golang:1.27.3-alpine-dev AS compile
+ARG APP_VERSION
+
+COPY . /src
+
+WORKDIR /src
+
+RUN set -x \
+    && LDFLAGS="-s -w -X gh.tarampamp.am/error-pages/v4/internal/appmeta.version=${APP_VERSION}" \
+    && go generate -skip readme ./... \
+    && CGO_ENABLED=0 go build -trimpath -ldflags "${LDFLAGS}" -o /tmp/error-pages ./cmd/error-pages/ \
+    && /tmp/error-pages --version \
+    && /tmp/error-pages -h
+
+WORKDIR /tmp/rootfs-base
+RUN set -x \
+    && mkdir -p ./etc/ssl/certs ./bin ./tmp \
+    && echo 'appuser:x:1000:1000::/nonexistent:/sbin/nologin' > ./etc/passwd \
+    && echo 'appuser:x:1000:' > ./etc/group \
+    && cp /etc/ssl/certs/ca-certificates.crt ./etc/ssl/certs/ \
+    && chmod 1777 ./tmp
+
+WORKDIR /tmp/rootfs/server
+RUN set -x \
+    && cp -a /tmp/rootfs-base/. . \
+    && mv /tmp/error-pages ./bin/error-pages \
+    && chmod 555 ./bin/error-pages
+
+FROM scratch AS server
+
+COPY --from=compile /tmp/rootfs/server /
+
+ENV LOG_LEVEL="info" \
+    LOG_FORMAT="json"
+
+EXPOSE 8080
+
+USER 1000:1000
+
+ENTRYPOINT ["/bin/error-pages"]

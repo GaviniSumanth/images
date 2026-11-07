@@ -24,7 +24,7 @@
         "/^releases\\.json$/"
       ],
       "matchStrings": [
-        "$.repositories.{\"depName\": repository, \"currentValue\": version}"
+        "$.repositories.{\"depName\": $replace(repository, /^https:\\/\\/github\\.com\\//, \"\"), \"currentValue\": version}"
       ],
       "datasourceTemplate": "github-releases",
       "versioningTemplate": "loose"
@@ -33,7 +33,8 @@
   "enabledManagers": [
     "dockerfile",
     "github-actions",
-    "jsonata",
+    "custom.jsonata",
+    "pip_requirements",
     "renovate-config"
   ],
   "packageRules": [

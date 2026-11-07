@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+
 # Build image
 FROM dhi.io/rust:1-alpine-dev AS chef
 
@@ -47,6 +49,63 @@ RUN set -eux; \
     for file in $(cat app/static/fonts/fonts.txt); do wget -P app/static/fonts "$file"; done; \
     chmod a+r -R .
 
+# Build a minimal init helper that seeds the config on first start.
+# This keeps the runtime image free of a shell while preserving the
+# upstream behaviour for empty bind-mounted /data directories.
+FROM dhi.io/golang:1.27.3-alpine-dev AS entrypoint
+
+WORKDIR /src
+
+COPY <<'EOF' /src/main.go
+package main
+
+import (
+	"fmt"
+	"os"
+	"syscall"
+)
+
+const (
+	binaryPath   = "/app/lldap"
+	configPath   = "/data/lldap_config.toml"
+	templatePath = "/app/lldap_config.docker_template.toml"
+)
+
+func main() {
+	if err := os.MkdirAll("/data", 0o755); err != nil {
+		fatal("create data directory", err)
+	}
+
+	if _, err := os.Stat(configPath); err != nil {
+		if !os.IsNotExist(err) {
+			fatal("stat config", err)
+		}
+
+		contents, err := os.ReadFile(templatePath)
+		if err != nil {
+			fatal("read config template", err)
+		}
+
+		if err = os.WriteFile(configPath, contents, 0o644); err != nil {
+			fatal("write config", err)
+		}
+	}
+
+	args := append([]string{binaryPath}, os.Args[1:]...)
+	if err := syscall.Exec(binaryPath, args, os.Environ()); err != nil {
+		fatal("exec lldap", err)
+	}
+}
+
+func fatal(action string, err error) {
+	fmt.Fprintf(os.Stderr, "lldap-entrypoint: %s: %v\n", action, err)
+	os.Exit(1)
+}
+EOF
+
+RUN go mod init lldap-entrypoint \
+    && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/lldap-entrypoint .
+
 FROM dhi.io/rust:1-alpine-dev AS runtime-deps
 
 USER root
@@ -67,7 +126,9 @@ COPY --from=builder --chown=1000:1000 /app/app/index_local.html app/index.html
 COPY --from=builder --chown=1000:1000 /app/app/static app/static
 COPY --from=builder --chown=1000:1000 /app/app/pkg app/pkg
 COPY --from=builder --chown=1000:1000 /app/target/release/lldap /app/target/release/lldap_migration_tool /app/target/release/lldap_set_password ./
+COPY --from=builder --chown=1000:1000 /app/lldap_config.docker_template.toml /app/lldap_config.docker_template.toml
 COPY --from=builder --chown=1000:1000 /app/lldap_config.docker_template.toml /data/lldap_config.toml
+COPY --from=entrypoint --chown=1000:1000 /out/lldap-entrypoint /app/lldap-entrypoint
 
 ENV LDAP_PORT=3890
 ENV HTTP_PORT=17170
@@ -76,5 +137,5 @@ EXPOSE ${LDAP_PORT} ${HTTP_PORT}
 
 USER 1000:1000
 
-ENTRYPOINT ["/app/lldap"]
+ENTRYPOINT ["/app/lldap-entrypoint"]
 CMD ["run", "--config-file", "/data/lldap_config.toml"]
