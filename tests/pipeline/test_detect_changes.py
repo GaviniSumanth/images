@@ -95,6 +95,7 @@ def test_removed_image_is_not_built():
     [
         "a/Containerfile",
         "a/Containerfile.dockerignore",
+        "a/assets/config/default.conf",
     ],
 )
 def test_containerfile_changes_build_that_image(path):

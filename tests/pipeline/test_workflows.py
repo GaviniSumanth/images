@@ -68,6 +68,13 @@ def test_build_job_uses_the_matrix_prebuild_test():
     assert "PREBUILD_IMAGE" not in text
 
 
+def test_build_job_stages_optional_image_assets():
+    steps = workflow("container-pipeline.yml")["jobs"]["build"]["steps"]
+    stage = next(step for step in steps if step.get("name") == "Stage image assets")
+    assert "prepare_build_context.py" in stage["run"]
+    assert "matrix.release.image" in stage["run"]
+
+
 def test_pipeline_has_build_test_scan_publish_and_verify_jobs():
     jobs = workflow("container-pipeline.yml")["jobs"]
     assert {"build", "test", "scan", "publish", "verify"} <= set(jobs)

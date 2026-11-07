@@ -7,4 +7,5 @@ EXPECTED_PORTS = {
     "authelia": (9091,),
     "error-pages": (8080,),
     "lldap": (3890, 17170),
+    "qbittorrent": (8080, 6881),
 }

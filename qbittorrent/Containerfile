@@ -1,0 +1,66 @@
+# syntax=docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+
+ARG BUILD_IMAGE=dhi.io/alpine-base:3.24-alpine3.24-dev
+
+FROM --platform=$BUILDPLATFORM ${BUILD_IMAGE} AS prepare
+
+ARG APP_VERSION
+
+RUN set -eux; \
+    : "${APP_VERSION:?APP_VERSION build argument is required}"; \
+    apk add --no-cache ca-certificates curl jq; \
+    release="$(curl --fail --show-error --location --retry 5 --retry-all-errors --retry-delay 2 \
+        "https://api.github.com/repos/userdocs/qbittorrent-nox-static/releases/tags/${APP_VERSION}")"; \
+    digest="$(printf '%s' "${release}" | jq --exit-status --raw-output \
+        --arg tag "${APP_VERSION}" \
+        'select(.tag_name == $tag) | [.assets[] | select(.name == "x86_64-qbittorrent-nox") | .digest] | if length == 1 then .[0] else error("expected one x86_64 binary asset") end')"; \
+    case "${digest}" in \
+        sha256:*) asset_sha256="${digest#sha256:}" ;; \
+        *) echo "Invalid upstream binary digest: ${digest}" >&2; exit 1 ;; \
+    esac; \
+    if [ "${#asset_sha256}" -ne 64 ]; then \
+        echo "Invalid upstream binary SHA-256 length" >&2; \
+        exit 1; \
+    fi; \
+    case "${asset_sha256}" in \
+        *[!0-9a-f]*) echo "Invalid upstream binary SHA-256: ${asset_sha256}" >&2; exit 1 ;; \
+    esac; \
+    mkdir -p /tmp/download /runtime-root/usr/bin /runtime-root/etc/ssl/certs /runtime-root/config /runtime-root/tmp; \
+    curl --fail --show-error --location --retry 5 --retry-all-errors --retry-delay 2 \
+        "https://github.com/userdocs/qbittorrent-nox-static/releases/download/${APP_VERSION}/x86_64-qbittorrent-nox" \
+        --output /tmp/download/qbittorrent-nox; \
+    printf '%s  %s\n' "${asset_sha256}" /tmp/download/qbittorrent-nox | sha256sum -c; \
+    cp /tmp/download/qbittorrent-nox /runtime-root/usr/bin/qbittorrent-nox; \
+    chmod 0555 /runtime-root/usr/bin/qbittorrent-nox; \
+    cp /etc/ssl/certs/ca-certificates.crt /runtime-root/etc/ssl/certs/ca-certificates.crt; \
+    chown 1000:1000 /runtime-root/config; \
+    chmod 1777 /runtime-root/tmp
+
+COPY --chown=1000:1000 container-assets/config/qBittorrent.conf /runtime-root/usr/share/qbittorrent/qBittorrent.conf
+
+FROM dhi.io/golang:1.27.3-alpine-dev@sha256:f6fe351ecd427d8b75d4dbebd5573fb2fd2e1df2bf678cc33d1d83f1bbcfd288 AS entrypoint
+
+WORKDIR /src
+
+COPY container-assets/entrypoint/main.go /src/main.go
+
+RUN go mod init qbittorrent-entrypoint \
+    && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/qbittorrent-entrypoint .
+
+FROM dhi.io/static:20261020-alpine@sha256:c78b2c2034b3fb2f83a337b6353c3ef27d910a828d9127ff342014e7b225c04e AS runtime
+
+COPY --from=prepare /runtime-root/ /
+COPY --from=entrypoint --chown=1000:1000 /out/qbittorrent-entrypoint /usr/bin/qbittorrent-entrypoint
+
+ENV HOME=/config \
+    XDG_CONFIG_HOME=/config \
+    XDG_DATA_HOME=/config
+
+WORKDIR /config
+
+EXPOSE 8080 6881/tcp 6881/udp
+
+USER 1000:1000
+
+ENTRYPOINT ["/usr/bin/qbittorrent-entrypoint"]
+CMD ["--confirm-legal-notice", "--profile=/config", "--webui-port=8080", "--torrenting-port=6881"]

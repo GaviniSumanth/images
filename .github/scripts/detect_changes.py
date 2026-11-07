@@ -116,6 +116,7 @@ def build_required(entry: dict, previous: dict | None, changed: list[str]) -> bo
 
     return any(
         path in (containerfile, f"{containerfile}.dockerignore")
+        or path.startswith(f"{entry['image']}/assets/")
         for containerfile in containerfiles
         for path in changed
     )

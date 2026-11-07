@@ -49,6 +49,9 @@ jobs:
           path: source
           persist-credentials: false
 
+      - name: Stage image assets
+        run: python3 build/.github/scripts/prepare_build_context.py source "build/${{ matrix.release.image }}/assets"
+
       - name: Validate upstream tag
         run: python3 build/.github/scripts/validate_upstream_tags.py "${{ matrix.release.image }}"
 

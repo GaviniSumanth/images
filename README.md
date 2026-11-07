@@ -4,9 +4,9 @@ This repository builds hardened OCI images for upstream applications. Each image
 is built from an exact upstream release tag with a `Containerfile` kept here, then
 tested, scanned, and published to GitHub Container Registry.
 
-Current images: `audiobookshelf`, `authelia`, `error-pages`, and `lldap`. Pinned
-upstream versions and OCI metadata live in `releases.json`, which is the single
-source of truth.
+Current images: `audiobookshelf`, `authelia`, `error-pages`, `lldap`, and
+`qbittorrent`. Pinned upstream versions and OCI metadata live in `releases.json`,
+which is the single source of truth.
 
 ## Image invariants
 

@@ -51,6 +51,19 @@
         "org.opencontainers.image.documentation": "https://tarampampam.github.io/error-pages/",
         "org.opencontainers.image.licenses": "MIT"
       }
+    },
+    {
+      "repository": "https://github.com/userdocs/qbittorrent-nox-static",
+      "version": "release-5.3.0_v2.1.2",
+      "containerfile": "qbittorrent/Containerfile",
+      "image": "qbittorrent",
+      "metadata": {
+        "org.opencontainers.image.title": "qBittorrent",
+        "org.opencontainers.image.description": "Open-source BitTorrent client with a web interface",
+        "org.opencontainers.image.url": "https://www.qbittorrent.org/",
+        "org.opencontainers.image.documentation": "https://userdocs.github.io/qbittorrent-nox-static/introduction/",
+        "org.opencontainers.image.licenses": "GPL-3.0"
+      }
     }
   ]
 }
