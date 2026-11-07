@@ -36,6 +36,10 @@ def test_external_actions_are_pinned_to_commits(path):
     for uses in uses_values(data):
         if uses.startswith("./"):
             continue
+        if uses.startswith("$/"):
+            reusable_workflow = REPO_ROOT / uses[2:]
+            assert reusable_workflow.is_file(), uses
+            continue
         assert re.fullmatch(r"[^@\s]+@[0-9a-f]{40}", uses), uses
 
 
@@ -58,7 +62,8 @@ def test_prebuild_step_is_unconditional():
         if step.get("name") == "Run pre-build validation tests"
     )
     assert "if" not in step
-    assert "matrix.release.prebuild_test" in step["run"]
+    assert step["env"]["PREBUILD_TEST"] == "${{ matrix.release.prebuild_test }}"
+    assert '"${PREBUILD_TEST}"' in step["run"]
 
 
 def test_build_job_uses_the_matrix_prebuild_test():
@@ -72,7 +77,8 @@ def test_build_job_stages_optional_image_assets():
     steps = workflow("container-pipeline.yml")["jobs"]["build"]["steps"]
     stage = next(step for step in steps if step.get("name") == "Stage image assets")
     assert "prepare_build_context.py" in stage["run"]
-    assert "matrix.release.image" in stage["run"]
+    assert stage["env"]["IMAGE_NAME"] == "${{ matrix.release.image }}"
+    assert '"build/${IMAGE_NAME}/assets"' in stage["run"]
 
 
 def test_pipeline_has_build_test_scan_publish_and_verify_jobs():
