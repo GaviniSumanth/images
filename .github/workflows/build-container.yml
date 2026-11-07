@@ -18,7 +18,6 @@ on:
 
 permissions:
   contents: read
-  packages: write
 
 concurrency:
   group: container-build-${{ github.ref }}
@@ -29,6 +28,10 @@ jobs:
     name: Detect changed releases
     runs-on: ubuntu-latest
     timeout-minutes: 10
+
+    permissions:
+      contents: read
+      packages: read # Reconciliation checks whether published GHCR aliases exist.
 
     outputs:
       build_matrix: ${{ steps.reconcile.outputs.build_matrix }}
@@ -81,9 +84,14 @@ jobs:
     name: Run Container Pipeline
     needs: detect
     if: needs.detect.outputs.build_matrix != '[]' || needs.detect.outputs.verify_matrix != '[]'
-    uses: ./.github/workflows/container-pipeline.yml
+    uses: $/.github/workflows/container-pipeline.yml
     with:
       build_matrix: ${{ needs.detect.outputs.build_matrix }}
       verify_matrix: ${{ needs.detect.outputs.verify_matrix }}
       owner: ${{ needs.detect.outputs.owner }}
-    secrets: inherit
+    permissions:
+      contents: read
+      packages: write # The called workflow publishes tested images to GHCR.
+    secrets:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
