@@ -1,3 +1,4 @@
+import hashlib
 import io
 import json
 import os
@@ -16,6 +17,7 @@ from publish_image import (
     platform_manifest_digest,
     publish,
     raw_digest,
+    read_image_index,
     read_oci_index,
     verify_labels,
 )
@@ -74,6 +76,36 @@ def oci_archive(tmp_path, raw=None):
         info = tarfile.TarInfo("index.json")
         info.size = len(raw)
         tar.addfile(info, io.BytesIO(raw))
+    return str(path)
+
+
+def nested_oci_archive(tmp_path):
+    """Build the layout buildx produces: a wrapper index around the image index."""
+    inner = index_bytes()
+    inner_digest = "sha256:" + hashlib.sha256(inner).hexdigest()
+    wrapper = json.dumps(
+        {
+            "schemaVersion": 2,
+            "mediaType": "application/vnd.oci.image.index.v1+json",
+            "manifests": [
+                {
+                    "mediaType": "application/vnd.oci.image.index.v1+json",
+                    "digest": inner_digest,
+                    "size": len(inner),
+                }
+            ],
+        }
+    ).encode()
+
+    path = tmp_path / "nested.oci.tar"
+    with tarfile.open(path, "w") as tar:
+        for name, data in (
+            ("index.json", wrapper),
+            (f"blobs/sha256/{inner_digest.split(':', 1)[1]}", inner),
+        ):
+            info = tarfile.TarInfo(name)
+            info.size = len(data)
+            tar.addfile(info, io.BytesIO(data))
     return str(path)
 
 
@@ -142,6 +174,42 @@ def test_read_oci_index(tmp_path):
 def test_read_oci_index_rejects_missing_file(tmp_path):
     with pytest.raises(PublishError):
         read_oci_index(str(tmp_path / "missing.tar"))
+
+
+def test_read_image_index_unwraps_nested_buildx_index(tmp_path):
+    raw = read_image_index(nested_oci_archive(tmp_path))
+    assert platform_manifest_digest(raw) == PLATFORM_DIGEST
+    assert manifest_digests(raw) == {PLATFORM_DIGEST, ATTESTATION_DIGEST}
+    assert attestation_count(raw) == 1
+
+
+def test_read_image_index_keeps_a_plain_index(tmp_path):
+    raw = index_bytes()
+    assert read_image_index(oci_archive(tmp_path, raw)) == raw
+
+
+def test_read_image_index_rejects_a_missing_wrapper_blob(tmp_path):
+    archive = tmp_path / "broken.oci.tar"
+    wrapper = json.dumps(
+        {
+            "schemaVersion": 2,
+            "mediaType": "application/vnd.oci.image.index.v1+json",
+            "manifests": [
+                {
+                    "mediaType": "application/vnd.oci.image.index.v1+json",
+                    "digest": "sha256:" + "d" * 64,
+                    "size": 1,
+                }
+            ],
+        }
+    ).encode()
+    with tarfile.open(archive, "w") as tar:
+        info = tarfile.TarInfo("index.json")
+        info.size = len(wrapper)
+        tar.addfile(info, io.BytesIO(wrapper))
+
+    with pytest.raises(PublishError, match="blobs/sha256"):
+        read_image_index(str(archive))
 
 
 def test_index_helpers():
@@ -218,6 +286,17 @@ def test_publish_pushes_immutable_and_alias(tmp_path):
     registry = FakeRegistry(raw)
 
     publish_image(tmp_path, registry)
+
+    assert registry.copies == [
+        "docker://ghcr.io/owner/example:v1.2.3-42-1",
+        "docker://ghcr.io/owner/example:v1.2.3",
+    ]
+
+
+def test_publish_accepts_a_nested_buildx_archive(tmp_path):
+    registry = FakeRegistry(index_bytes())
+
+    publish_image(tmp_path, registry, archive=nested_oci_archive(tmp_path))
 
     assert registry.copies == [
         "docker://ghcr.io/owner/example:v1.2.3-42-1",

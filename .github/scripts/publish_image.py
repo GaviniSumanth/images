@@ -14,6 +14,11 @@ from release_config import ReleaseConfigError, required_env
 
 CREATED_PATTERN = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
 ATTESTATION_TYPE = "attestation-manifest"
+DIGEST_PATTERN = re.compile(r"[a-z0-9]+:[0-9a-f]+")
+INDEX_MEDIA_TYPES = {
+    "application/vnd.oci.image.index.v1+json",
+    "application/vnd.docker.distribution.manifest.list.v2+json",
+}
 
 
 class PublishError(Exception):
@@ -34,6 +39,53 @@ def read_oci_index(archive: str) -> bytes:
             return extracted.read()
     except (KeyError, OSError, tarfile.TarError) as error:
         raise PublishError(f"Unable to read OCI archive {archive}: {error}") from error
+
+
+def read_oci_blob(archive: str, digest: str) -> bytes:
+    if not isinstance(digest, str) or not DIGEST_PATTERN.fullmatch(digest):
+        raise PublishError(f"Invalid OCI digest: {digest!r}")
+
+    algorithm, _, value = digest.partition(":")
+    member_name = f"blobs/{algorithm}/{value}"
+    try:
+        with tarfile.open(archive) as tar:
+            member = tar.getmember(member_name)
+            extracted = tar.extractfile(member)
+            if extracted is None:
+                raise PublishError(f"OCI archive {archive} has no readable {member_name}")
+            return extracted.read()
+    except (KeyError, OSError, tarfile.TarError) as error:
+        raise PublishError(
+            f"Unable to read {member_name} from OCI archive {archive}: {error}"
+        ) from error
+
+
+def read_image_index(archive: str) -> bytes:
+    """Return the image index, unwrapping buildx's layout wrapper index.
+
+    ``docker buildx build --output type=oci`` writes the layout ``index.json``
+    as a single-entry index that points at the image index carrying the
+    platform and attestation manifests. Resolve that wrapper so callers inspect
+    the real image index.
+    """
+    raw = read_oci_index(archive)
+    seen = set()
+
+    while True:
+        manifests = index_manifests(raw)
+        if len(manifests) != 1:
+            return raw
+
+        manifest = manifests[0]
+        if manifest.get("mediaType") not in INDEX_MEDIA_TYPES:
+            return raw
+
+        digest = manifest.get("digest")
+        if not isinstance(digest, str) or digest in seen:
+            return raw
+
+        seen.add(digest)
+        raw = read_oci_blob(archive, digest)
 
 
 def index_manifests(raw_index: bytes) -> list[dict]:
@@ -232,7 +284,7 @@ def publish(
     authfile: str | None = None,
     runner=subprocess.run,
 ) -> None:
-    source_raw = read_oci_index(archive)
+    source_raw = read_image_index(archive)
     platform_digest = platform_manifest_digest(source_raw)
     source_digests = manifest_digests(source_raw)
     attestations = attestation_count(source_raw)
