@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
 
-FROM dhi.io/golang:1.27.3-alpine-dev@sha256:f6fe351ecd427d8b75d4dbebd5573fb2fd2e1df2bf678cc33d1d83f1bbcfd288 AS compile
+FROM dhi.io/golang:1.27.3-alpine-dev@sha256:bc66efe51594cd50a6cf42d36f8521c6d643bd9be206acf606753ed15b23f0e1 AS compile
 ARG APP_VERSION
 
 COPY . /src
