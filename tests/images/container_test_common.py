@@ -29,10 +29,18 @@ def docker_client():
     return _client
 
 
+def image_name(reference):
+    """Return the repository name from an image reference."""
+    name = reference.split("@", 1)[0]
+    _, _, tail = name.rpartition("/")
+    return tail.split(":", 1)[0]
+
+
 def release_entry(image):
+    name = image_name(image)
     data = json.loads((REPO_ROOT / "releases.json").read_text(encoding="utf-8"))
     for entry in data["repositories"]:
-        if entry["image"] == image:
+        if entry["image"] == name:
             return entry
 
     pytest.fail(f"No releases.json entry found for image {image!r}")
