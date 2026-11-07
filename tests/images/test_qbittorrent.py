@@ -1,10 +1,13 @@
+import io
 import os
-import tempfile
-from pathlib import Path
+import tarfile
+from contextlib import contextmanager
 from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
 
 import pytest
+
+from docker.errors import NotFound
 
 from container_test_common import (
     check_image_contract,
@@ -23,6 +26,36 @@ pytestmark = [
     pytest.mark.integration,
     pytest.mark.skipif(IMAGE is None, reason="TEST_IMAGE is not set"),
 ]
+
+
+@contextmanager
+def managed_config_volume():
+    volume = docker_client().volumes.create()
+    try:
+        yield volume
+    finally:
+        volume.remove(force=True)
+
+
+def archive_file(name, contents):
+    data = contents.encode("utf-8")
+    archive = io.BytesIO()
+    with tarfile.open(fileobj=archive, mode="w") as tar:
+        info = tarfile.TarInfo(name)
+        info.size = len(data)
+        info.mode = 0o644
+        tar.addfile(info, io.BytesIO(data))
+    archive.seek(0)
+    return archive
+
+
+def read_container_file(container, path):
+    archive, _ = container.get_archive(path)
+    with tarfile.open(fileobj=io.BytesIO(b"".join(archive))) as tar:
+        file_name = path.rsplit("/", 1)[-1]
+        config_file = tar.extractfile(file_name)
+        assert config_file is not None
+        return config_file.read().decode("utf-8")
 
 
 def wait_for_web_ui(container):
@@ -49,21 +82,19 @@ def test_image_contract():
 
 
 def test_web_ui_becomes_ready_and_seeds_default_config():
-    with tempfile.TemporaryDirectory() as config_dir:
-        os.chmod(config_dir, 0o777)
-        config_file = (
-            Path(config_dir) / "qBittorrent" / "config" / "qBittorrent.conf"
-        )
+    with managed_config_volume() as config_volume:
         container = docker_client().containers.run(
             IMAGE,
             detach=True,
             name=container_name("qbittorrent"),
             ports={"8080/tcp": ("127.0.0.1", None)},
-            volumes={config_dir: {"bind": "/config", "mode": "rw"}},
+            volumes={config_volume.name: {"bind": "/config", "mode": "rw"}},
         )
         with managed_container(container):
             wait_for_web_ui(container)
-            config = config_file.read_text(encoding="utf-8")
+            config = read_container_file(
+                container, "/config/qBittorrent/config/qBittorrent.conf"
+            )
 
             assert "Connection\\UPnP=false" in config
             assert "Downloads\\SavePath=/downloads/" in config
@@ -72,19 +103,27 @@ def test_web_ui_becomes_ready_and_seeds_default_config():
 
 
 def test_nonempty_config_directory_is_not_seeded():
-    with tempfile.TemporaryDirectory() as config_dir:
-        os.chmod(config_dir, 0o777)
-        marker = Path(config_dir) / "keep-me"
-        marker.write_text("existing config data", encoding="utf-8")
-        config_file = (
-            Path(config_dir) / "qBittorrent" / "config" / "qBittorrent.conf"
-        )
-        container = docker_client().containers.run(
+    with managed_config_volume() as config_volume:
+        container = docker_client().containers.create(
             IMAGE,
             command=["--version"],
-            remove=True,
-            volumes={config_dir: {"bind": "/config", "mode": "rw"}},
+            volumes={config_volume.name: {"bind": "/config", "mode": "rw"}},
         )
-        assert b"qBittorrent v5.3.0" in container
-        assert marker.read_text(encoding="utf-8") == "existing config data"
-        assert not config_file.exists()
+        with managed_container(container):
+            assert container.put_archive(
+                "/config", archive_file("keep-me", "existing config data")
+            )
+            container.start()
+            result = container.wait(timeout=30)
+
+            assert result["StatusCode"] == 0
+            assert b"qBittorrent v5.3.0" in container.logs()
+            assert (
+                read_container_file(container, "/config/keep-me")
+                == "existing config data"
+            )
+
+            with pytest.raises(NotFound):
+                container.get_archive(
+                    "/config/qBittorrent/config/qBittorrent.conf"
+                )
