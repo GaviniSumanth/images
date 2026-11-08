@@ -18,9 +18,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
-    environment:
-      name: renovate
-
     permissions:
       contents: write # Renovate commits dependency updates.
       pull-requests: write # Renovate creates and updates pull requests.

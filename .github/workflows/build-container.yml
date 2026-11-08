@@ -84,7 +84,7 @@ jobs:
     name: Run Container Pipeline
     needs: detect
     if: needs.detect.outputs.build_matrix != '[]' || needs.detect.outputs.verify_matrix != '[]'
-    uses: $/.github/workflows/container-pipeline.yml
+    uses: ./.github/workflows/container-pipeline.yml
     with:
       build_matrix: ${{ needs.detect.outputs.build_matrix }}
       verify_matrix: ${{ needs.detect.outputs.verify_matrix }}
