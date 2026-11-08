@@ -117,7 +117,7 @@ RUN set -eux; \
     install -D /etc/ssl/certs/ca-certificates.crt /runtime-root/etc/ssl/certs/ca-certificates.crt
 
 # Final image
-FROM dhi.io/static:20261020-alpine@sha256:c78b2c2034b3fb2f83a337b6353c3ef27d910a828d9127ff342014e7b225c04e AS runtime
+FROM dhi.io/static:20261020-alpine@sha256:4767f889704f46bbf9b83bd0225e0e868ae0cb45ddc5627350ecf1449a019721 AS runtime
 
 WORKDIR /app
 

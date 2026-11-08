@@ -47,7 +47,7 @@ COPY container-assets/entrypoint/main.go /src/main.go
 RUN go mod init qbittorrent-entrypoint \
     && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/qbittorrent-entrypoint .
 
-FROM dhi.io/static:20261020-alpine@sha256:c78b2c2034b3fb2f83a337b6353c3ef27d910a828d9127ff342014e7b225c04e AS runtime
+FROM dhi.io/static:20261020-alpine@sha256:4767f889704f46bbf9b83bd0225e0e868ae0cb45ddc5627350ecf1449a019721 AS runtime
 
 COPY --from=prepare /runtime-root/ /
 COPY --from=entrypoint --chown=1000:1000 /out/qbittorrent-entrypoint /usr/bin/qbittorrent-entrypoint
