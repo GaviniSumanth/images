@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
 
 # Build image
-FROM dhi.io/rust:1-alpine-dev@sha256:e4c9ccbceaf78cf72ec14234f32311b3afa80ac37f0e177537bd7cd5a81d124b AS chef
+FROM dhi.io/rust:1-alpine-dev@sha256:77540081a5fdeb74058a64031ad1d1915e42f2b23aba48b67d9b89037f3fb05b AS chef
 
 RUN set -x \
     # Add user
@@ -106,7 +106,7 @@ EOF
 RUN go mod init lldap-entrypoint \
     && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/lldap-entrypoint .
 
-FROM dhi.io/rust:1-alpine-dev@sha256:e4c9ccbceaf78cf72ec14234f32311b3afa80ac37f0e177537bd7cd5a81d124b AS runtime-deps
+FROM dhi.io/rust:1-alpine-dev@sha256:77540081a5fdeb74058a64031ad1d1915e42f2b23aba48b67d9b89037f3fb05b AS runtime-deps
 
 USER root
 RUN set -eux; \
