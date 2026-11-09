@@ -78,7 +78,7 @@ def test_build_job_stages_optional_image_assets():
     stage = next(step for step in steps if step.get("name") == "Stage image assets")
     assert "prepare_build_context.py" in stage["run"]
     assert stage["env"]["IMAGE_NAME"] == "${{ matrix.release.image }}"
-    assert '"build/${IMAGE_NAME}/assets"' in stage["run"]
+    assert '"build/images/${IMAGE_NAME}/assets"' in stage["run"]
 
 
 def test_pipeline_has_build_test_scan_publish_and_verify_jobs():

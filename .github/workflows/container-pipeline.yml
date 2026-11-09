@@ -53,7 +53,7 @@ jobs:
       - name: Stage image assets
         env:
           IMAGE_NAME: ${{ matrix.release.image }}
-        run: python3 build/.github/scripts/prepare_build_context.py source "build/${IMAGE_NAME}/assets"
+        run: python3 build/.github/scripts/prepare_build_context.py source "build/images/${IMAGE_NAME}/assets"
 
       - name: Validate upstream tag
         env:
