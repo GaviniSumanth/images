@@ -71,7 +71,12 @@ def run_git(
     for key in ("GITHUB_TOKEN", "GH_TOKEN"):
         environment.pop(key, None)
     for key in tuple(environment):
-        if key.startswith("GIT_CONFIG_"):
+        if key.startswith("GIT_CONFIG_") or key in {
+            "GIT_AUTHOR_NAME",
+            "GIT_AUTHOR_EMAIL",
+            "GIT_COMMITTER_NAME",
+            "GIT_COMMITTER_EMAIL",
+        }:
             environment.pop(key)
     environment["GIT_TERMINAL_PROMPT"] = "0"
 

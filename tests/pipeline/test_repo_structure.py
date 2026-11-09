@@ -1,3 +1,4 @@
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -45,7 +46,15 @@ def test_generic_prebuild_test_exists():
 
 
 def test_no_shell_scripts():
-    assert list(REPO_ROOT.rglob("*.sh")) == []
+    # Check tracked files only so generated or ignored tooling (for example the
+    # husky shims under .husky/_) is not mistaken for repository content.
+    result = subprocess.run(
+        ["git", "-C", str(REPO_ROOT), "ls-files", "--", "*.sh"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert result.stdout.split() == []
 
 
 def test_releases_json_has_no_packaging_revision_field():

@@ -37,6 +37,7 @@
     "dockerfile",
     "github-actions",
     "custom.jsonata",
+    "npm",
     "pip_requirements",
     "renovate-config"
   ],

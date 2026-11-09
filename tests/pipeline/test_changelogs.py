@@ -39,8 +39,12 @@ BRANCH = "automation/changelogs"
 
 
 def git(repo: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess:
+    command = ["git"]
+    if (repo / "HEAD").is_file() and (repo / "objects").is_dir():
+        command.append(f"--git-dir={repo}")
+    command.extend(args)
     return subprocess.run(
-        ["git", *args],
+        command,
         cwd=repo,
         check=check,
         capture_output=True,
