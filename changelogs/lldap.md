@@ -6,6 +6,7 @@ Generated from Git history with Git-cliff, grouped by commit date (UTC).
 
 ### Dependency updates
 
+- Update dhi.io/rust:1-alpine-dev Docker digest to 7754008 ([`33bc8d2`](https://github.com/GaviniSumanth/images/commit/33bc8d23322337ff68cd46b883533656769b4a02))
 - Update dhi.io/golang:1.27.3-alpine-dev Docker digest to 9589496 ([`f14a845`](https://github.com/GaviniSumanth/images/commit/f14a845c32136e637b8717a5b42d1442bbb69c2e))
 - Update dhi.io/static:20261020-alpine Docker digest to 4767f88 ([`92808e0`](https://github.com/GaviniSumanth/images/commit/92808e0645114c1682151aa4ec8d1e3d20c648b3))
 

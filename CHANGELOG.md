@@ -4,6 +4,10 @@ Generated from Git history with Git-cliff, grouped by commit date (UTC).
 
 ## 2026-11-09
 
+### Dependency updates
+
+- Update renovatebot/github-action action to v46.3.13 ([`4cbb386`](https://github.com/GaviniSumanth/images/commit/4cbb386bd9adbc5f16cf8cabc5ed456b39984390))
+
 ### Other changes
 
 - Add changelog workflow ([`de0c5a1`](https://github.com/GaviniSumanth/images/commit/de0c5a1955cc6d9de38cd41e384713cf04d61c40))
@@ -12,6 +16,8 @@ Generated from Git history with Git-cliff, grouped by commit date (UTC).
 
 ### Dependency updates
 
+- Update Node.js to 3e61a81 ([`f878a9c`](https://github.com/GaviniSumanth/images/commit/f878a9cc1b82654d74322cfe24b833e22676ac72))
+- Update dhi.io/rust:1-alpine-dev Docker digest to 7754008 ([`33bc8d2`](https://github.com/GaviniSumanth/images/commit/33bc8d23322337ff68cd46b883533656769b4a02))
 - Update dhi.io/golang:1.27.3-alpine-dev Docker digest to 9589496 ([`f14a845`](https://github.com/GaviniSumanth/images/commit/f14a845c32136e637b8717a5b42d1442bbb69c2e))
 - Update dhi.io/alpine-base:3.24-alpine3.24-dev Docker digest to 6930a22 ([`e2b823f`](https://github.com/GaviniSumanth/images/commit/e2b823ffec7067e9d71eaead18020f9daa86f112))
 - Update Node.js to e640b13 ([`afd8a41`](https://github.com/GaviniSumanth/images/commit/afd8a41122b30d1be83275a9f6bf22c08cf63702))

@@ -6,6 +6,7 @@ Generated from Git history with Git-cliff, grouped by commit date (UTC).
 
 ### Dependency updates
 
+- Update Node.js to 3e61a81 ([`f878a9c`](https://github.com/GaviniSumanth/images/commit/f878a9cc1b82654d74322cfe24b833e22676ac72))
 - Update dhi.io/golang:1.27.3-alpine-dev Docker digest to 9589496 ([`f14a845`](https://github.com/GaviniSumanth/images/commit/f14a845c32136e637b8717a5b42d1442bbb69c2e))
 - Update dhi.io/static:20261020-alpine Docker digest to 4767f88 ([`92808e0`](https://github.com/GaviniSumanth/images/commit/92808e0645114c1682151aa4ec8d1e3d20c648b3))
 - Update Node.js to 7eb8c79 ([`1819d67`](https://github.com/GaviniSumanth/images/commit/1819d676fb11927d904dc503cbe93405a8315335))
