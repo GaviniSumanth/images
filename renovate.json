@@ -6,6 +6,9 @@
   ],
   "prConcurrentLimit": 5,
   "prHourlyLimit": 2,
+  "semanticCommits": "enabled",
+  "semanticCommitType": "chore",
+  "semanticCommitScope": "deps",
   "labels": [
     "dependencies",
     "renovate"

@@ -1,0 +1,51 @@
+[changelog]
+header = """
+# Changelog
+
+Generated from Git history with Git-cliff, grouped by commit date (UTC).
+"""
+body = """
+
+{% if version %}\
+## {{ version }}
+{% else %}\
+## Unreleased
+{% endif %}\
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group | striptags | trim }}
+
+{% for commit in commits %}\
+- {% if commit.breaking %}**Breaking:** {% endif %}{{ commit.message | split(pat="\n") | first | upper_first | trim }} ([`{{ commit.id | truncate(length=7, end="") }}`](__REPOSITORY_URL__/commit/{{ commit.id }}))
+{% endfor -%}
+{% endfor %}\
+"""
+trim = true
+
+[git]
+conventional_commits = true
+filter_unconventional = false
+split_commits = false
+protect_breaking_commits = true
+filter_commits = false
+sort_commits = "newest"
+commit_parsers = [
+  { message = '^docs\(changelog\)!?:', skip = true },
+  { message = '^chore\(changelog\)!?:', skip = true },
+  { message = "^Merge ", skip = true },
+  { message = '^chore\(deps(?:-[^)]*)?\)!?:', group = "<!-- 0 -->Dependency updates" },
+  { message = '^fix\(deps(?:-[^)]*)?\)!?:', group = "<!-- 0 -->Dependency updates" },
+  { message = '^build\(deps(?:-[^)]*)?\)!?:', group = "<!-- 0 -->Dependency updates" },
+  { message = '^Update .+ (?:Docker tag|action|digest) to ', group = "<!-- 0 -->Dependency updates" },
+  { message = '^Update (?:Node\.js|npm|pnpm|yarn|Go|Golang|Python|Rust|Rust toolchain) ', group = "<!-- 0 -->Dependency updates" },
+  { message = '^Pin .+ (?:Docker tag|action|digest) to ', group = "<!-- 0 -->Dependency updates" },
+  { message = '^Pin dependencies$', group = "<!-- 0 -->Dependency updates" },
+  { message = "^feat", group = "<!-- 1 -->Features" },
+  { message = "^fix", group = "<!-- 2 -->Bug fixes" },
+  { message = "^perf", group = "<!-- 3 -->Performance" },
+  { message = "^docs?", group = "<!-- 4 -->Documentation" },
+  { message = "^refactor", group = "<!-- 5 -->Refactoring" },
+  { message = "^test", group = "<!-- 6 -->Tests" },
+  { message = "^(ci|build)", group = "<!-- 7 -->Build and CI" },
+  { message = "^revert", group = "<!-- 8 -->Reverts" },
+  { message = ".*", group = "<!-- 9 -->Other changes" },
+]

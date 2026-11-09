@@ -56,8 +56,10 @@ and ask instead of silently relaxing them.
 | `tests/requirements-test.txt` | Pinned test dependencies. |
 | `pyproject.toml` | Pytest paths, import roots, and markers. |
 | `.github/scripts/` | Python CI helpers and validators. |
+| `.github/changelog.toml` | Git-cliff template and commit grouping rules. |
 | `.github/workflows/build-container.yml` | Validation, unit tests, change detection, and pipeline dispatch. |
 | `.github/workflows/container-pipeline.yml` | Reusable build, test, scan, publish, and verify workflow. |
+| `.github/workflows/changelog.yml` | Changelog generation and pull-request publishing. |
 | `.github/workflows/renovate.yml` | Scheduled Renovate runs. |
 | `renovate.json` | Dependency update policy. |
 
@@ -177,6 +179,38 @@ earlier build failed before publish) is promoted to the build matrix and
 rebuilt instead of being verified. Registry or authentication errors fail the
 detection job closed.
 
+## Changelog workflow
+
+`changelog.yml` runs on pushes to `main` and on manual dispatch. It is split so
+that untrusted generated data never runs as code with a write token:
+
+1. **Generate** (`contents: read`): checks out full history without persisted
+   credentials, installs the pinned `git-cliff` release with the pinned
+   `taiki-e/install-action`, and runs
+   `.github/scripts/generate_changelogs.py`. The generator uses Git-cliff's
+   structured context, groups commits into one section per UTC commit date,
+   renders the repository changelog and one changelog per image, and uploads
+   only `CHANGELOG.md` and `changelogs/` as an artifact.
+2. **Publish** (`contents: write`, `pull-requests: write`): checks out trusted
+   repository code at `github.sha`, downloads the artifact into the runner
+   temporary directory, and runs
+   `.github/scripts/publish_changelogs.py`. The artifact is treated as data:
+   the script rejects symlinks, unexpected entries, non-UTF-8 or empty files,
+   and invalid image names; it copies only validated `CHANGELOG.md` and
+   `changelogs/*.md` files, removes stale image changelogs, and stages only
+   those paths.
+3. It commits to `automation/changelogs`, pushes with `--force-with-lease` after
+   checking the remote branch, and creates or updates a pull request against the
+   default branch. It must never push directly to `main`.
+
+`CHANGELOG.md` is generated from the repository history; do not hand-edit it or
+the files under `changelogs/`. Run `python3 .github/scripts/generate_changelogs.py`
+locally with `git-cliff` on `PATH` to refresh them. The template lives in
+`.github/changelog.toml`; it uses the `__REPOSITORY_URL__` placeholder so the
+repository URL is not hardcoded, groups sections by UTC commit date, and skips
+`docs(changelog)`/`chore(changelog)` commits to avoid feedback loops. The
+workflow commit uses the `docs(changelog):` prefix for that reason.
+
 ## Containerfile conventions
 
 - Start with the repository's pinned `# syntax=docker/dockerfile:1@sha256:...`
@@ -294,6 +328,14 @@ detection job closed.
   verification, and label verification.
 - Preserve the `BEFORE`/`CURRENT` environment-variable contract used by the
   workflow, as well as optional argv support.
+- Keep changelog generation deterministic: one Git process for changed paths,
+  no hardcoded repository URL, and no `GIT_CLIFF_BIN` path coupling. The
+  workflow installs Git-cliff on `PATH`; `GIT_CLIFF_BIN` is only a local
+  override.
+- Treat the downloaded changelog artifact as untrusted data. `publish_changelogs.py`
+  must keep its artifact-tree validation, symlink rejection, generated-path-only
+  staging, `--force-with-lease` update, and pull-request flow. Never commit
+  changelogs directly to `main`.
 
 ## Validation
 

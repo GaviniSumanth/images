@@ -10,6 +10,7 @@ from release_config import (
     release_tag,
     repositories_from_data,
     image_test_file,
+    validate_repository_slug,
 )
 
 pytestmark = pytest.mark.unit
@@ -52,6 +53,35 @@ def test_github_slug_rejects_invalid_urls(url):
 
 def test_github_slug_returns_slug():
     assert github_slug("https://github.com/Owner/Project") == "Owner/Project"
+
+
+@pytest.mark.parametrize(
+    "slug",
+    ["owner/name", "Owner/Name.with-dots_1", "a/b"],
+)
+def test_validate_repository_slug_accepts_valid_slugs(slug):
+    assert validate_repository_slug(slug) == slug
+
+
+@pytest.mark.parametrize(
+    "slug",
+    [
+        None,
+        42,
+        "",
+        "owner",
+        "owner/",
+        "/name",
+        "owner/name/extra",
+        "-bad/name",
+        "owner/name.git",
+        "owner/..",
+        "owner/bad name",
+    ],
+)
+def test_validate_repository_slug_rejects_invalid_slugs(slug):
+    with pytest.raises(ReleaseConfigError):
+        validate_repository_slug(slug)
 
 
 def test_repositories_from_data_supports_object_and_list():

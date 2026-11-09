@@ -86,6 +86,25 @@ def load_repositories(path: Path = RELEASES_FILE) -> list[dict]:
     return repositories
 
 
+def validate_repository_slug(value: object) -> str:
+    """Return a validated GitHub owner/name slug."""
+    if not isinstance(value, str):
+        raise ReleaseConfigError("repository slug must be a string")
+
+    parts = value.split("/")
+    if len(parts) != 2:
+        raise ReleaseConfigError("repository slug must contain an owner and a name")
+
+    owner, name = parts
+    if not OWNER_PATTERN.fullmatch(owner) or not REPOSITORY_NAME_PATTERN.fullmatch(name):
+        raise ReleaseConfigError("repository owner or name is invalid")
+
+    if name in (".", "..") or name.lower().endswith(".git"):
+        raise ReleaseConfigError("repository name is ambiguous or invalid")
+
+    return f"{owner}/{name}"
+
+
 def github_slug(repository: object) -> str:
     """Return the owner/name slug for a GitHub HTTPS repository URL."""
     if not isinstance(repository, str):
@@ -110,11 +129,4 @@ def github_slug(repository: object) -> str:
     if len(parts) != 2:
         raise ReleaseConfigError("repository must contain an owner and a name")
 
-    owner, name = parts
-    if not OWNER_PATTERN.fullmatch(owner) or not REPOSITORY_NAME_PATTERN.fullmatch(name):
-        raise ReleaseConfigError("repository owner or name is invalid")
-
-    if name in (".", "..") or name.lower().endswith(".git"):
-        raise ReleaseConfigError("repository name is ambiguous or invalid")
-
-    return f"{owner}/{name}"
+    return validate_repository_slug("/".join(parts))

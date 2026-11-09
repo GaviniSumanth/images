@@ -21,6 +21,9 @@ which is the single source of truth.
 | Path | Purpose |
 | --- | --- |
 | `releases.json` | Upstream repository, version, Containerfile, image name, and metadata pins. |
+| `CHANGELOG.md` | Generated repository-wide release and dependency history. |
+| `changelogs/` | Generated changelog for each container image. |
+| `.github/changelog.toml` | Git-cliff template and commit grouping rules. |
 | `<image>/Containerfile` | Per-image build definition and build-context exclusions. |
 | `tests/pipeline/` | Fast, offline tests for the CI scripts and repository structure. |
 | `tests/containerfiles/` | Static checks for Containerfile invariants and upstream parity. |
@@ -50,6 +53,30 @@ are published.
 Every build gets an immutable tag of the form `vX.Y.Z-<run_number>-<run_attempt>`.
 The mutable `vX.Y.Z` alias is moved only after the tested and scanned archive is
 published.
+
+## Changelogs
+
+The `changelog.yml` workflow regenerates the repository-wide `CHANGELOG.md` and
+one changelog per image under `changelogs/` on every push to `main`. Git-cliff
+groups conventional commits and Renovate updates, including application
+dependencies, container/base-image versions, and image digests. The Python
+generator groups entries into one section per UTC commit date and attributes
+`releases.json` updates only to the affected image.
+
+The `generate` job checks out the repository without persisted Git credentials,
+installs the pinned `git-cliff` release with `taiki-e/install-action`, and
+uploads only the generated `CHANGELOG.md` and `changelogs/` files as an
+artifact. The `publish` job checks out trusted repository code again, downloads
+the artifact as untrusted data, validates its file tree, commits only the
+generated paths to `automation/changelogs`, and opens or updates a pull request
+against the default branch. It never pushes directly to `main`. The write token
+is scoped to the publish job and passed only to the Git commands that contact
+the remote.
+
+The automation branch is force-updated with `--force-with-lease` so a rewritten
+history cannot overwrite a concurrent update. Commits made by the workflow use
+the `docs(changelog):` prefix, which the template skips to avoid changelog
+feedback loops.
 
 ## Local validation
 
