@@ -24,7 +24,7 @@ which is the single source of truth.
 | `CHANGELOG.md` | Generated repository-wide release and dependency history. |
 | `changelogs/` | Generated changelog for each container image. |
 | `.github/changelog.toml` | Git-cliff template and commit grouping rules. |
-| `<image>/Containerfile` | Per-image build definition and build-context exclusions. |
+| `images/<image>/Containerfile` | Per-image build definition and build-context exclusions. |
 | `tests/pipeline/` | Fast, offline tests for the CI scripts and repository structure. |
 | `tests/containerfiles/` | Static checks for Containerfile invariants and upstream parity. |
 | `tests/images/` | Docker integration tests, one file per published image. |
@@ -97,7 +97,7 @@ TEST_IMAGE=ghcr.io/owner/image:vX.Y.Z python3 -m pytest -m integration
 ## Adding or updating an image
 
 1. Update only the `version` field in `releases.json` for a routine upstream bump.
-2. Add `<image>/Containerfile`, `<image>/Containerfile.dockerignore`, and
+2. Add `images/<image>/Containerfile`, `images/<image>/Containerfile.dockerignore`, and
    `tests/images/test_<image>.py` for a new image.
 3. Keep upstream application source unmodified; changes belong in the
    Containerfile, tests, `releases.json`, or CI scripts.

@@ -46,8 +46,8 @@ and ask instead of silently relaxing them.
 | Path | Purpose |
 | --- | --- |
 | `releases.json` | Image matrix and upstream version/metadata pins. |
-| `<image>/Containerfile` | Per-image build definition. |
-| `<image>/Containerfile.dockerignore` | Required build-context exclusions. |
+| `images/<image>/Containerfile` | Per-image build definition. |
+| `images/<image>/Containerfile.dockerignore` | Required build-context exclusions. |
 | `tests/images/test_<image>.py` | Required Docker integration suite, with hyphens normalized to underscores. |
 | `tests/images/container_test_common.py` | Shared Docker SDK helpers: image contract, cleanup, readiness polling. |
 | `tests/image_contract.py` | Expected runtime user and exposed ports per image. |
@@ -76,7 +76,7 @@ The canonical shape is:
     {
       "repository": "https://github.com/owner/name",
       "version": "v1.2.3",
-      "containerfile": "image/Containerfile",
+      "containerfile": "images/image/Containerfile",
       "image": "image",
       "metadata": {
         "org.opencontainers.image.title": "Upstream name",
@@ -96,7 +96,7 @@ Rules enforced by `.github/scripts/validate_releases.py` and
 - `repository` must be exactly `https://github.com/<owner>/<name>`.
   No credentials, ports, query strings, fragments, or `.git` suffixes.
 - `version` must be an exact upstream tag that exists on the remote.
-- `containerfile` must match `<directory>/Containerfile` and exist locally.
+- `containerfile` must match `images/<directory>/Containerfile` and exist locally.
 - `image` must be lowercase and unique.
 - Repository slugs must be unique, case-insensitively.
 - Required metadata: `title`, `description`, `url`, `documentation`, and
@@ -294,7 +294,8 @@ workflow commit uses the `docs(changelog):` prefix for that reason.
 
 ### Add a new image
 
-1. Create `<image>/Containerfile` and `<image>/Containerfile.dockerignore`.
+1. Create `images/<image>/Containerfile` and
+   `images/<image>/Containerfile.dockerignore`.
 2. Add one `releases.json` entry with a unique lowercase image name, unique
    upstream repository, exact tag, and complete OCI metadata.
 3. Add `tests/images/test_<image>.py` covering the image contract and real

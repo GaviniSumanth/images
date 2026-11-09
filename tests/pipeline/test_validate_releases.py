@@ -24,7 +24,7 @@ def entry(**overrides):
     value = {
         "repository": "https://github.com/owner/example",
         "version": "v1.2.3",
-        "containerfile": "example/Containerfile",
+        "containerfile": "images/example/Containerfile",
         "image": "example",
         "metadata": copy.deepcopy(METADATA),
     }
@@ -55,6 +55,8 @@ def test_missing_field_is_rejected(field):
         ("version", "has space"),
         ("containerfile", "Containerfile"),
         ("containerfile", "/etc/Containerfile"),
+        ("containerfile", "example/Containerfile"),
+        ("containerfile", "images/Containerfile"),
         ("image", "Example"),
         ("image", "bad/name"),
         ("metadata", []),
@@ -104,7 +106,7 @@ def test_duplicate_images_are_rejected():
                 entry(),
                 entry(
                     repository="https://github.com/other/example",
-                    containerfile="other/Containerfile",
+                    containerfile="images/other/Containerfile",
                 ),
             ]
         )
@@ -118,7 +120,7 @@ def test_duplicate_repositories_are_rejected_case_insensitively():
                 entry(
                     repository="https://github.com/Owner/Example",
                     image="other",
-                    containerfile="other/Containerfile",
+                    containerfile="images/other/Containerfile",
                 ),
             ]
         )

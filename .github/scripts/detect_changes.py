@@ -114,9 +114,13 @@ def build_required(entry: dict, previous: dict | None, changed: list[str]) -> bo
     if previous.get("containerfile"):
         containerfiles.add(previous["containerfile"])
 
+    asset_prefixes = (
+        f"{entry['image']}/assets/",
+        f"images/{entry['image']}/assets/",
+    )
     return any(
         path in (containerfile, f"{containerfile}.dockerignore")
-        or path.startswith(f"{entry['image']}/assets/")
+        or path.startswith(asset_prefixes)
         for containerfile in containerfiles
         for path in changed
     )

@@ -110,7 +110,9 @@ class FakeGitHub:
 
         class Handler(http.server.BaseHTTPRequestHandler):
             def do_GET(self):
-                owner.requests.append(("GET", self.path, None))
+                owner.requests.append(
+                    ("GET", self.path, None, self.headers.get("Authorization"))
+                )
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
                 self.end_headers()
@@ -119,7 +121,9 @@ class FakeGitHub:
             def do_POST(self):
                 length = int(self.headers.get("Content-Length", "0"))
                 payload = json.loads(self.rfile.read(length))
-                owner.requests.append(("POST", self.path, payload))
+                owner.requests.append(
+                    ("POST", self.path, payload, self.headers.get("Authorization"))
+                )
                 self.send_response(201)
                 self.send_header("Content-Type", "application/json")
                 self.end_headers()
@@ -156,6 +160,7 @@ def test_image_context_filters_paths_and_release_updates():
             "version": None,
             "commits": [
                 {"id": "image-change", "message": "update image"},
+                {"id": "legacy-image-change", "message": "update legacy image"},
                 {"id": "release-change", "message": "update release"},
                 {"id": "other-image", "message": "update other image"},
             ],
@@ -166,18 +171,20 @@ def test_image_context_filters_paths_and_release_updates():
         context,
         "books",
         {
-            "image-change": {"books/Containerfile"},
+            "image-change": {"images/books/Containerfile"},
+            "legacy-image-change": {"books/Containerfile"},
             "release-change": {"releases.json"},
-            "other-image": {"other/Containerfile"},
+            "other-image": {"images/other/Containerfile"},
         },
         {"release-change": {"books"}},
     )
 
     assert [commit["id"] for commit in filtered[0]["commits"]] == [
         "image-change",
+        "legacy-image-change",
         "release-change",
     ]
-    assert len(context[0]["commits"]) == 3
+    assert len(context[0]["commits"]) == 4
 
 
 def test_image_context_omits_empty_release_sections():
@@ -780,6 +787,7 @@ def test_publish_script_runs_end_to_end(tmp_path):
     assert [request[0] for request in github.requests] == ["GET", "POST"]
     assert github.requests[1][2]["head"] == BRANCH
     assert github.requests[1][2]["base"] == "main"
+    assert all(request[3] == "Bearer test-token" for request in github.requests)
 
 
 def test_publish_force_updates_a_diverged_automation_branch(tmp_path, monkeypatch):

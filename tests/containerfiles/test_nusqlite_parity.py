@@ -12,7 +12,7 @@ from prebuild import (
 pytestmark = pytest.mark.unit
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-OURS = REPO_ROOT / "audiobookshelf" / "Containerfile"
+OURS = REPO_ROOT / "images" / "audiobookshelf" / "Containerfile"
 
 OFFICIAL_FIXTURE = r'''
 RUN case "$TARGETPLATFORM" in \

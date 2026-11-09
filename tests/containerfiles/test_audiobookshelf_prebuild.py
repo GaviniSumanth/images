@@ -18,7 +18,9 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 def test_nusqlite_parity(upstream_dockerfile):
     ours = parse_nusqlite(
-        (REPO_ROOT / "audiobookshelf" / "Containerfile").read_text(encoding="utf-8")
+        (REPO_ROOT / "images" / "audiobookshelf" / "Containerfile").read_text(
+            encoding="utf-8"
+        )
     )
     upstream = parse_nusqlite(
         upstream_dockerfile.read_text(encoding="utf-8")

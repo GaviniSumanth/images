@@ -286,14 +286,14 @@ def filter_context_for_image(
     release_changes: dict[str, set[str]],
 ) -> list[dict]:
     filtered = []
-    image_prefix = f"{image}/"
+    image_prefixes = (f"{image}/", f"images/{image}/")
     for release in context:
         selected = copy.deepcopy(release)
         selected["commits"] = [
             commit
             for commit in release["commits"]
             if any(
-                path.startswith(image_prefix)
+                path.startswith(image_prefixes)
                 for path in paths_by_commit.get(commit["id"], set())
             )
             or image in release_changes.get(commit["id"], set())

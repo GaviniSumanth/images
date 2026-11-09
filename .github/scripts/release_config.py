@@ -15,7 +15,7 @@ REPOSITORY_NAME_PATTERN = re.compile(r"[A-Za-z0-9_.-]{1,100}")
 IMAGE_PATTERN = re.compile(r"[a-z0-9]+(?:[._-][a-z0-9]+)*")
 VERSION_PATTERN = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}")
 CONTAINERFILE_PATTERN = re.compile(
-    r"[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*/Containerfile"
+    r"images/[A-Za-z0-9_-]+/Containerfile"
 )
 MAX_TAG_LENGTH = 128
 

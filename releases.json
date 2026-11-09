@@ -3,7 +3,7 @@
     {
       "repository": "https://github.com/advplyr/audiobookshelf",
       "version": "v2.37.2",
-      "containerfile": "audiobookshelf/Containerfile",
+      "containerfile": "images/audiobookshelf/Containerfile",
       "image": "audiobookshelf",
       "metadata": {
         "org.opencontainers.image.title": "Audiobookshelf",
@@ -16,7 +16,7 @@
     {
       "repository": "https://github.com/lldap/lldap",
       "version": "v0.6.3",
-      "containerfile": "lldap/Containerfile",
+      "containerfile": "images/lldap/Containerfile",
       "image": "lldap",
       "metadata": {
         "org.opencontainers.image.title": "LLDAP",
@@ -29,7 +29,7 @@
     {
       "repository": "https://github.com/authelia/authelia",
       "version": "v4.39.28",
-      "containerfile": "authelia/Containerfile",
+      "containerfile": "images/authelia/Containerfile",
       "image": "authelia",
       "metadata": {
         "org.opencontainers.image.title": "Authelia",
@@ -42,7 +42,7 @@
     {
       "repository": "https://github.com/tarampampam/error-pages",
       "version": "v4.2.7",
-      "containerfile": "error-pages/Containerfile",
+      "containerfile": "images/error-pages/Containerfile",
       "image": "error-pages",
       "metadata": {
         "org.opencontainers.image.title": "error-pages",
@@ -55,7 +55,7 @@
     {
       "repository": "https://github.com/userdocs/qbittorrent-nox-static",
       "version": "release-5.3.0_v2.1.2",
-      "containerfile": "qbittorrent/Containerfile",
+      "containerfile": "images/qbittorrent/Containerfile",
       "image": "qbittorrent",
       "metadata": {
         "org.opencontainers.image.title": "qBittorrent",

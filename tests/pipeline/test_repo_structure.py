@@ -29,9 +29,10 @@ def test_release_has_integration_test(entry):
 
 def test_no_orphan_image_directories():
     image_directories = {
-        path.parent.name for path in REPO_ROOT.glob("*/Containerfile")
+        path.parent.name for path in REPO_ROOT.glob("images/*/Containerfile")
     }
     assert image_directories == {entry["image"] for entry in REPOSITORIES}
+    assert list(REPO_ROOT.glob("*/Containerfile")) == []
 
 
 def test_requirements_and_project_config_exist():

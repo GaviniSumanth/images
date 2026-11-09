@@ -22,14 +22,14 @@ REPOSITORIES = [
     {
         "repository": "https://github.com/owner/a",
         "version": "v1.0.0",
-        "containerfile": "a/Containerfile",
+        "containerfile": "images/a/Containerfile",
         "image": "a",
         "metadata": {"org.opencontainers.image.title": "A"},
     },
     {
         "repository": "https://github.com/owner/b",
         "version": "v2.0.0",
-        "containerfile": "b/Containerfile",
+        "containerfile": "images/b/Containerfile",
         "image": "b",
         "metadata": {"org.opencontainers.image.title": "B"},
     },
@@ -57,7 +57,7 @@ def test_full_rebuild_builds_everything():
     ("field", "value"),
     [
         ("version", "v1.1.0"),
-        ("containerfile", "new/Containerfile"),
+        ("containerfile", "images/new/Containerfile"),
         ("image", "new"),
         ("metadata", {"org.opencontainers.image.title": "New"}),
     ],
@@ -77,7 +77,7 @@ def test_new_image_is_built():
         {
             "repository": "https://github.com/owner/c",
             "image": "c",
-            "containerfile": "c/Containerfile",
+            "containerfile": "images/c/Containerfile",
         }
     )
     current.append(new)
@@ -93,9 +93,9 @@ def test_removed_image_is_not_built():
 @pytest.mark.parametrize(
     "path",
     [
-        "a/Containerfile",
-        "a/Containerfile.dockerignore",
-        "a/assets/config/default.conf",
+        "images/a/Containerfile",
+        "images/a/Containerfile.dockerignore",
+        "images/a/assets/config/default.conf",
     ],
 )
 def test_containerfile_changes_build_that_image(path):
@@ -187,10 +187,10 @@ def test_audiobookshelf_uses_a_specific_prebuild_test():
 
 
 def git_repository(repo):
-    (repo / "a").mkdir()
-    (repo / "b").mkdir()
-    (repo / "a" / "Containerfile").write_text("FROM scratch\n")
-    (repo / "b" / "Containerfile").write_text("FROM scratch\n")
+    (repo / "images" / "a").mkdir(parents=True)
+    (repo / "images" / "b").mkdir()
+    (repo / "images" / "a" / "Containerfile").write_text("FROM scratch\n")
+    (repo / "images" / "b" / "Containerfile").write_text("FROM scratch\n")
     write_json(repo / "releases.json", {"repositories": repositories()})
     first = commit_all(repo, "initial")
     return repo, first
@@ -204,7 +204,7 @@ def test_build_matrices_initial_revision_builds_all(git_repo):
 
 def test_build_matrices_detects_containerfile_change(git_repo):
     repo, first = git_repository(git_repo)
-    (repo / "a" / "Containerfile").write_text("FROM scratch\n# changed\n")
+    (repo / "images" / "a" / "Containerfile").write_text("FROM scratch\n# changed\n")
     second = commit_all(repo, "change a")
     result = build_matrices(first, second, cwd=repo)
     assert [entry["image"] for entry in result["build"]] == ["a"]
@@ -228,12 +228,12 @@ def test_build_matrices_rejects_invalid_current(git_repo):
 
 def test_changed_files_uses_nul_delimited_output(git_repo):
     repo, first = git_repository(git_repo)
-    (repo / "a" / "Containerfile").write_text("FROM scratch\n# changed\n")
-    (repo / "b" / "Containerfile").write_text("FROM scratch\n# changed\n")
+    (repo / "images" / "a" / "Containerfile").write_text("FROM scratch\n# changed\n")
+    (repo / "images" / "b" / "Containerfile").write_text("FROM scratch\n# changed\n")
     second = commit_all(repo, "change both")
     assert changed_files(first, second, cwd=repo) == [
-        "a/Containerfile",
-        "b/Containerfile",
+        "images/a/Containerfile",
+        "images/b/Containerfile",
     ]
 
 
