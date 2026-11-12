@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
 
-ARG NODE_BUILD_IMAGE=dhi.io/node:24-alpine-dev@sha256:e640b13bfdb3befe5820fde98520aba1d81de96ebb5237f1f3a166352924707a
-ARG NODE_RUNTIME_IMAGE=dhi.io/node:24-alpine@sha256:8c18e7e46740c3997bd33d6c3a6b9e01915e2ed9db7c9bc649fea14f55ba7dfd
+ARG NODE_BUILD_IMAGE=dhi.io/node:26-alpine-dev@sha256:16375cc385b69dbd63d19603d5ba671493294b4cd4d0e3d8132abb0562e29db5
+ARG NODE_RUNTIME_IMAGE=dhi.io/node:26-alpine@sha256:f7b40a7a5e3b75dafd68687f9f5cd4989a2ca02a5004e03147596e7bf8653acc
 
 ARG NUSQLITE3_DIR=/usr/local/lib/nusqlite3
 ARG NUSQLITE3_PATH=${NUSQLITE3_DIR}/libnusqlite3.so
