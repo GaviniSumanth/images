@@ -52,7 +52,7 @@ RUN set -eux; \
 # Build a minimal init helper that seeds the config on first start.
 # This keeps the runtime image free of a shell while preserving the
 # upstream behaviour for empty bind-mounted /data directories.
-FROM dhi.io/golang:1.27.3-alpine-dev@sha256:95894969dcf353c87cd1b9730e599e1d3c3b7519c8966d28120859609269df4d AS entrypoint
+FROM dhi.io/golang:1.27.4-alpine-dev@sha256:72cac473a0b802b521e23a2aed591ad166645729533d6d3db4ce96ae22c697ff AS entrypoint
 
 WORKDIR /src
 
