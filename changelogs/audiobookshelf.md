@@ -2,6 +2,12 @@
 
 Generated from Git history with Git-cliff, grouped by commit date (UTC).
 
+## 2026-11-09
+
+### Refactoring
+
+- Move image build definitions under images/ ([`2c5f8b0`](https://github.com/GaviniSumanth/images/commit/2c5f8b03be2873df7c8f67a89c781dd06d8968bb))
+
 ## 2026-11-08
 
 ### Dependency updates
