@@ -2,14 +2,48 @@
 
 Generated from Git history with Git-cliff, grouped by commit date (UTC).
 
+## 2026-11-18
+
+### Dependency updates
+
+- Update taiki-e/install-action action to v2.90.6 ([`22d92cd`](https://github.com/GaviniSumanth/images/commit/22d92cd61a7a8c92e159135739c913bdf1f5fb45))
+
+## 2026-11-13
+
+### Dependency updates
+
+- Update node.js to 4544851 ([`ac9adb5`](https://github.com/GaviniSumanth/images/commit/ac9adb580c1a82f83b4b9fec3e3ca139a5c43d1e))
+- Update dhi.io/golang docker tag to v1.27.4 ([`cd75128`](https://github.com/GaviniSumanth/images/commit/cd75128d5c5ad1379234134797e653641c012061))
+
+## 2026-11-12
+
+### Dependency updates
+
+- Update node.js to 16375cc ([`dffc0ca`](https://github.com/GaviniSumanth/images/commit/dffc0caa955088e92711c8e5ab2339220e0b2add))
+
+## 2026-11-10
+
+### Dependency updates
+
+- Update dhi.io/alpine-base:3.24-alpine3.24-dev docker digest to 266554e ([`e7eee1a`](https://github.com/GaviniSumanth/images/commit/e7eee1ac307103731f7d60f31fd958d315ff5e99))
+
 ## 2026-11-09
 
 ### Dependency updates
 
 - Update renovatebot/github-action action to v46.3.13 ([`4cbb386`](https://github.com/GaviniSumanth/images/commit/4cbb386bd9adbc5f16cf8cabc5ed456b39984390))
 
+### Bug fixes
+
+- Update asset path in build context preparation ([`19791e4`](https://github.com/GaviniSumanth/images/commit/19791e471723b790b290b078f26eb31059b2acf7))
+
+### Refactoring
+
+- Move image build definitions under images/ ([`2c5f8b0`](https://github.com/GaviniSumanth/images/commit/2c5f8b03be2873df7c8f67a89c781dd06d8968bb))
+
 ### Other changes
 
+- Enforce strict conventional commit policy ([`1104118`](https://github.com/GaviniSumanth/images/commit/110411886bc09f16274d0e99a55d5c3df44aaad3))
 - Add changelog workflow ([`de0c5a1`](https://github.com/GaviniSumanth/images/commit/de0c5a1955cc6d9de38cd41e384713cf04d61c40))
 
 ## 2026-11-08
