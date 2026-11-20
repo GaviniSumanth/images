@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+# syntax=docker/dockerfile:1@sha256:572cebbc2b15e6f84c077742952674889cb63cd5e9b80abdffcbe587b6f19183
 
 # Build image
 FROM dhi.io/rust:1-alpine-dev@sha256:77540081a5fdeb74058a64031ad1d1915e42f2b23aba48b67d9b89037f3fb05b AS chef
