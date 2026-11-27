@@ -2,6 +2,24 @@
 
 Generated from Git history with Git-cliff, grouped by commit date (UTC).
 
+## 2026-11-27
+
+### Dependency updates
+
+- Update dhi.io/rust:1-alpine-dev docker digest to 823ad44 ([`16e054c`](https://github.com/GaviniSumanth/images/commit/16e054c7ab9d811e9569d4069e1e892f57cd097b))
+
+## 2026-11-13
+
+### Dependency updates
+
+- Update dhi.io/golang docker tag to v1.27.4 ([`cd75128`](https://github.com/GaviniSumanth/images/commit/cd75128d5c5ad1379234134797e653641c012061))
+
+## 2026-11-09
+
+### Refactoring
+
+- Move image build definitions under images/ ([`2c5f8b0`](https://github.com/GaviniSumanth/images/commit/2c5f8b03be2873df7c8f67a89c781dd06d8968bb))
+
 ## 2026-11-08
 
 ### Dependency updates
