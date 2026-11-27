@@ -38,7 +38,7 @@ RUN set -eux; \
 
 COPY --chown=1000:1000 container-assets/config/qBittorrent.conf /runtime-root/usr/share/qbittorrent/qBittorrent.conf
 
-FROM dhi.io/golang:1.27.4-alpine-dev@sha256:72cac473a0b802b521e23a2aed591ad166645729533d6d3db4ce96ae22c697ff AS entrypoint
+FROM dhi.io/golang:1.27.4-alpine-dev@sha256:a76849b53b06b671dff57ebea6a83206c54a74e5fbd27ba365b9e2dc94a18195 AS entrypoint
 
 WORKDIR /src
 
