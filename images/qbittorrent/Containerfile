@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
 
-ARG BUILD_IMAGE=dhi.io/alpine-base:3.24-alpine3.24-dev@sha256:266554e75cb00f88effe4048ba78b6f628d6a5ca67ac9e9727ae37a4a1299ce5
+ARG BUILD_IMAGE=dhi.io/alpine-base:3.24-alpine3.24-dev@sha256:ab3130d401f94092d65c15d38566fbffdba1b4fe0f766968003535cdddf6d2e0
 
 FROM --platform=$BUILDPLATFORM ${BUILD_IMAGE} AS prepare
 
