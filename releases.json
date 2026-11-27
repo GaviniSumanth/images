@@ -41,7 +41,7 @@
     },
     {
       "repository": "https://github.com/tarampampam/error-pages",
-      "version": "v4.2.7",
+      "version": "v4.2.8",
       "containerfile": "images/error-pages/Containerfile",
       "image": "error-pages",
       "metadata": {
